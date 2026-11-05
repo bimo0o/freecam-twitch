@@ -7,7 +7,11 @@ const names=new Set([...html.matchAll(/(?:src|href)="\.\/([^"?#]+\.(?:js|css))"/
 // Resolve the setup entry's relative imports without shipping unrelated app views.
 for(const name of names){if(name.endsWith('.js')){const source=await readFile(`dist/${name}`,'utf8');for(const m of source.matchAll(/(?:from\s*|import\s*)["']\.\/([^"']+\.js)["']/g))names.add(path.posix.join(path.posix.dirname(name),m[1]));}}
 const notices=Buffer.concat([await readFile('node_modules/vite/LICENSE.md'),Buffer.from('\n\nManrope font — SIL Open Font License\n\n'),await readFile('public/brand/OFL.txt'),Buffer.from('\n\n'),await readFile('public/brand/FONTLOG.txt')]);
-const entries=[['/setup.html',Buffer.from(html.replace(/<p><a href="\/packed\.html[^]*?<\/a><\/p>/,'<p><a href="/LICENSE">Лицензия</a> · <a href="/notices.txt">Сторонние компоненты</a></p>'))],['/LICENSE',await readFile('LICENSE')],['/notices.txt',notices]];
+// OBS gets one self-contained document: no paths into the extracted archive.
+const fontData=(await readFile('public/brand/Manrope.ttf')).toString('base64');
+const brandCss=(await readFile('public/brand/brand.css','utf8')).replace("url('./Manrope.ttf')",`url('data:font/ttf;base64,${fontData}')`);
+const hint=(await readFile('public/obs-hint.html','utf8')).replace('<link rel="stylesheet" href="brand/brand.css">',`<style>${brandCss}</style>`).replace('src="brand/logo.png"',`src="data:image/png;base64,${(await readFile('public/brand/logo.png')).toString('base64')}"`);
+const entries=[['/setup.html',Buffer.from(html.replace('<html','<html data-freecam-desktop="true"').replace(/<p><a href="\/packed\.html[^]*?<\/a><\/p>/,'<p><a href="/LICENSE">Лицензия</a> · <a href="/notices.txt">Сторонние компоненты</a></p>'))],['/obs-hint.html',Buffer.from(hint)],['/LICENSE',await readFile('LICENSE')],['/notices.txt',notices]];
 for(const name of names)entries.push(['/'+name,await readFile('dist/'+name)]);
 for(const name of await readdir('public/brand'))if(!entries.some(([key])=>key==='/brand/'+name))entries.push(['/brand/'+name,await readFile('public/brand/'+name)]);
 const integer=n=>{const b=Buffer.alloc(4);b.writeInt32LE(n);return b;};

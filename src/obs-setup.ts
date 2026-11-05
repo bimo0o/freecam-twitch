@@ -1,5 +1,6 @@
 import type {ObsApi} from './obs-client';
 import {inspectScene,copyScene} from './obs-scene-copy';
+import {hintSettings,checkHintSettings} from './obs-hint';
 export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{sceneName?:string;hintFile?:string;hintUrl?:string}={}){
   if(!camera||(!options.sceneName&&(!game||game===camera)))throw Error('Выберите сцену или источник игры и отдельный источник камеры.');
   const stream=await obs.request('GetStreamStatus'),record=await obs.request('GetRecordStatus');
@@ -25,6 +26,7 @@ export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{s
   };
   const input=async(label:string,kind:string,settings:Record<string,unknown>,x:number,y:number,w:number,h:number)=>{
     const inputName=`${prefix} ${label}`;const result=await obs.request('CreateInput',{sceneName:name,inputName,inputKind:kind,inputSettings:settings,sceneItemEnabled:true});created.push(inputName);await place(result.sceneItemId,x,y,w,h);
+    return inputName;
   };
   try{
     await obs.request('CreateScene',{sceneName:name});sceneCreated=true;
@@ -38,7 +40,9 @@ export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{s
       await obs.request('SetSceneItemTransform',{sceneName:name,sceneItemId:cam.sceneItemId,sceneItemTransform:{cropLeft:t.cropLeft||0,cropTop:t.cropTop||0,cropRight:t.cropRight||0,cropBottom:t.cropBottom||0}});
     }
     for(const [label,x,y,value]of [['М1',1504,1016,0xff00ff00],['М2',1528,1016,0xffff00ff],['М3',1504,1040,0xffffff00],['М4',1528,1040,0xffffffff]] as const)await input(label,color,{color:value,width:24,height:24},x,y,24,24);
-    await input('Подсказка',browser,{width:1420,height:132,fps:30,shutdown:false,restart_when_active:false,...(options.hintFile?{is_local_file:true,local_file:options.hintFile}:{is_local_file:false,url:options.hintUrl||new URL('/obs-hint.html',location.href).href})},32,930,1420,132);
+    const hintLocation={hintFile:options.hintFile,hintUrl:options.hintUrl||(!options.hintFile?new URL('/obs-hint.html',location.href).href:undefined)};
+    const hintName=await input('Подсказка',browser,hintSettings(hintLocation),32,930,1420,132);
+    await checkHintSettings(obs,hintName,hintLocation);
     const video=await obs.request('GetVideoSettings');if(video.baseWidth!==previousVideo.baseWidth||video.outputWidth!==1920||video.baseHeight!==previousVideo.baseHeight||video.outputHeight!==1080)throw Error('OBS не применил выход 1080p или изменил исходный холст.');
     await obs.request('SetCurrentProgramScene',{sceneName:name});
     return {sceneName:name,verified:true,previousVideo,previousScene};

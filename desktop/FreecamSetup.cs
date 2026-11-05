@@ -6,12 +6,13 @@ using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Freecam Setup")]
-[assembly: AssemblyVersion("0.2.1.0")]
+[assembly: AssemblyVersion("0.2.2.0")]
 [assembly: AssemblyCopyright("Copyright © 2026 bimo0o")]
 
 // The desktop process serves only embedded, allowlisted static files on loopback.
@@ -21,6 +22,18 @@ internal static class FreecamSetup {
     static TcpListener listener;
     static string authority;
     static string url;
+    static string hintPath;
+    static string hintHash;
+    static readonly object HintLock = new object();
+    static string Hash(byte[] bytes) {
+        using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
+    }
+    static void EnsureHint() {
+        lock (HintLock) {
+            Directory.CreateDirectory(Path.GetDirectoryName(hintPath));
+            if (!File.Exists(hintPath) || Hash(File.ReadAllBytes(hintPath)) != hintHash) File.WriteAllBytes(hintPath, Assets["/obs-hint.html"]);
+        }
+    }
 
     [STAThread]
     static void Main(string[] args) {
@@ -32,9 +45,13 @@ internal static class FreecamSetup {
                     Assets.Add(name, reader.ReadBytes(reader.ReadInt32()));
                 }
             }
-            string hint = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "obs-hint.html");
-            if (!File.Exists(hint)) throw new FileNotFoundException("Extract the full Freecam ZIP before launch.");
-            Assets.Add("/runtime.json", Encoding.UTF8.GetBytes("{\"obsHintPath\":\"" + hint.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}"));
+            hintHash = Hash(Assets["/obs-hint.html"]);
+            bool headless = args.Length == 2 && args[0] == "--headless";
+            string assetRoot = headless ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[1])), "app-assets")
+                : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Freecam", "assets");
+            hintPath = Path.Combine(assetRoot, hintHash, "obs-hint.html");
+            EnsureHint();
+            Assets.Add("/runtime.json", Encoding.UTF8.GetBytes("{\"hintReady\":true,\"hintSha256\":\"" + hintHash + "\",\"obsHintPath\":\"" + hintPath.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}"));
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             authority = "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -93,6 +110,7 @@ internal static class FreecamSetup {
                     if (host != authority || (origin != "" && origin != "http://" + authority)) code = "403 Forbidden";
                     else if (first.Length == 3 && (first[0] == "GET" || first[0] == "HEAD")) {
                         string path = first[1].Split('?')[0]; if (path == "/") path = "/setup.html";
+                        if (path == "/runtime.json") EnsureHint();
                         if (Assets.TryGetValue(path, out body)) {
                             code = "200 OK";
                             type = path.EndsWith(".html") ? "text/html; charset=utf-8" : path.EndsWith(".json") ? "application/json; charset=utf-8" : path.EndsWith(".js") ? "text/javascript; charset=utf-8" : path.EndsWith(".css") ? "text/css; charset=utf-8" : path.EndsWith(".svg") ? "image/svg+xml" : path.EndsWith(".png") ? "image/png" : path.EndsWith(".ico") ? "image/x-icon" : path.EndsWith(".ttf") ? "font/ttf" : "text/plain; charset=utf-8";

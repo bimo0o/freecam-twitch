@@ -34,7 +34,7 @@ OBS размещает игру и камеру в разных частях о�
 
 ### Для стримера
 
-1. [Скачать приложение для Windows](https://github.com/bimo0o/freecam-twitch/releases/download/v0.2.1-streamer-preview/Freecam-Streamer-Windows.zip), распаковать архив и открыть **`Freecam Setup.exe`**. Node.js и установка проекта не нужны; мастер откроется в браузере.
+1. [Скачать приложение для Windows](https://github.com/bimo0o/freecam-twitch/releases/download/v0.2.2-streamer-preview/Freecam-Streamer-Windows.zip), распаковать архив и открыть **`Freecam Setup.exe`**. Node.js и установка проекта не нужны; мастер откроется в браузере.
 2. В OBS открыть **Tools / Сервис → WebSocket Server Settings / Настройки сервера WebSocket**. Включить **Enable WebSocket server / Включить сервер WebSocket**, оставить авторизацию включённой.
 3. Скопировать **Server Password / Пароль сервера** из OBS, вставить в поле **«Пароль OBS»** в мастере и нажать **«Подключить OBS»**.
 4. Выбрать **сцену для копирования** и источник вебки → **«Подготовить и открыть сцену»**. Чат, виджеты и оформление переносятся вместе с игрой.

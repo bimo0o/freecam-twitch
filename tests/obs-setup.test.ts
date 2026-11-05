@@ -2,7 +2,7 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import {p
 const hint={hintFile:'D:/Freecam/obs-hint.html'};
 const transform=(x=0,y=0,w=1280,h=720)=>({positionX:x,positionY:y,rotation:0,scaleX:1,scaleY:1,boundsType:'OBS_BOUNDS_NONE',boundsWidth:0,boundsHeight:0,sourceWidth:w,sourceHeight:h,cropLeft:0,cropTop:0,cropRight:0,cropBottom:0,alignment:5});
 function fixture(active=false,fail=false){
- const calls:{type:string,data:any}[]=[];let id=20,video:any={baseWidth:1280,baseHeight:720,outputWidth:1280,outputHeight:720};
+ const settings=new Map<string,any>();const calls:{type:string,data:any}[]=[];let id=20,video:any={baseWidth:1280,baseHeight:720,outputWidth:1280,outputHeight:720};
  const item=(sourceName:string,n:number,t=transform(),extra:any={})=>({sourceName,sceneItemId:n,sceneItemIndex:n-1,sceneItemEnabled:true,sceneItemLocked:false,sceneItemTransform:t,...extra});
  const scenes=new Map<string,any[]>([['Original',[item('Game',1),item('Chat',2,transform(900,50,300,600),{sceneItemLocked:true}),item('Camera group',3,transform(960,500,320,180),{isGroup:true})]],['Camera group',[item('Cam',4,{...transform(0,0,320,180),cropLeft:12}),item('Frame',5,transform(0,0,320,180))]]]);
  const api={request:async(type:string,data:any={})=>{calls.push({type,data:structuredClone(data)});switch(type){
@@ -15,7 +15,8 @@ function fixture(active=false,fail=false){
  case'GetSourceFilterList':return{filters:data.sourceName==='Original'?[{filterName:'Tone',filterKind:'color_filter',filterIndex:0,filterEnabled:true,filterSettings:{gamma:.1}}]:[]};
  case'GetSceneItemBlendMode':return{sceneItemBlendMode:'OBS_BLEND_NORMAL'};
  case'CreateScene':scenes.set(data.sceneName,[]);return{};
- case'CreateSceneItem':case'CreateInput':{const list=scenes.get(data.sceneName)!;const n=++id;list.push(item(data.sourceName||data.inputName,n));return{sceneItemId:n};}
+ case'GetInputSettings':return{inputSettings:settings.get(data.inputName)};
+ case'CreateSceneItem':case'CreateInput':{if(type==='CreateInput')settings.set(data.inputName,data.inputSettings);const list=scenes.get(data.sceneName)!;const n=++id;list.push(item(data.sourceName||data.inputName,n));return{sceneItemId:n};}
  case'SetSceneItemTransform':{if(fail)throw Error('transform failed');const found=scenes.get(data.sceneName)!.find(v=>v.sceneItemId===data.sceneItemId);found.sceneItemTransform={...found.sceneItemTransform,...data.sceneItemTransform};return{};}
  case'GetSceneItemTransform':return{sceneItemTransform:scenes.get(data.sceneName)!.find(v=>v.sceneItemId===data.sceneItemId).sceneItemTransform};
  default:return{};}}};return{api,calls,scenes};
