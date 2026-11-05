@@ -1,0 +1,52 @@
+Freecam Proprietary Source-Available License
+Version 1.0, 6 November 2026
+
+Copyright (c) 2026 bimo0o. All rights reserved in original copyrightable
+Freecam contributions, except for the limited permissions below.
+
+1. Scope
+This license covers original Freecam code, documentation, and design in
+this repository (the "Software"). It is not an open-source license.
+Third-party components and media are excluded; see section 5.
+
+2. Permitted end use
+You may download, copy, build, install, and run the Software for your own
+use as a viewer or broadcaster, including in monetized broadcasts.
+You may make private modifications solely to support that end use.
+You may keep the copies and backups necessary for these purposes.
+Retain this license and the copyright notices in those copies.
+No fee or share of broadcast revenue is required for this permitted use.
+
+3. Reserved rights
+Without prior written permission from the copyright holder, you may not
+redistribute, publish, sublicense, sell, rent, or offer the Software or
+modified versions to others, whether separately or bundled with another
+product or service. You may not reuse its code, documentation, or design
+in another product, rebrand it, or remove its copyright notices.
+Broadcasting video output made using the Software is permitted under
+section 2 and is not redistribution of the Software.
+This license does not grant trademark or patent rights.
+
+4. Public hosting and mandatory rights
+Nothing here limits rights expressly granted to users by the applicable
+GitHub Terms of Service, including viewing and forking public repositories
+on GitHub, or rights that applicable law does not allow to be restricted.
+Those platform rights do not grant additional product reuse or commercial
+distribution rights under this license.
+
+5. Third-party materials
+Dependencies, tools, and any third-party code retain their own licenses.
+This license does not replace or restrict permissions under those licenses.
+Third-party video, audio, images, and likenesses, including footage used
+in presentation GIFs, remain subject to their respective owners' rights.
+No ownership of that material or permission to reuse it is claimed here.
+See docs/assets/CREDITS.md for the presentation footage information.
+
+6. No warranty
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED "AS IS",
+WITHOUT WARRANTIES OF ANY KIND. THE COPYRIGHT HOLDER IS NOT LIABLE FOR
+CLAIMS, DAMAGES, OR OTHER LIABILITY ARISING FROM ITS USE.
+
+7. Other permissions
+For redistribution, product integration, or other rights not granted
+above, contact the repository owner at https://github.com/bimo0o.

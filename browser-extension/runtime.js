@@ -106,10 +106,15 @@
       schedule();
     }
     function visibility() { cancel(); if (document.hidden) original(); else schedule(); }
+    // Paused seeks need an explicit redraw: a decoder callback can arrive while
+    // readyState is low, with no subsequent playing frame to resume detection.
+    function seeking() { cancel(); }
+    function seeked() { cancel(); lastProbe=-Infinity; draw(performance.now()); }
     const resizeObserver = new ResizeObserver(size); resizeObserver.observe(parent); resizeObserver.observe(video);
     const routeTimer = setInterval(() => { if (!video.isConnected || location.pathname !== route) stop(); else if (adVisible()) original(); }, 1000);
     document.addEventListener('visibilitychange', visibility);
-    function stop() { if (stopped) return; stopped = true; cancel(); clearTimeout(savedTimer); clearInterval(routeTimer); resizeObserver.disconnect(); document.removeEventListener('visibilitychange', visibility); video.style.opacity = previousOpacity; parent.style.position = previousPosition; host.remove(); }
+    video.addEventListener('seeking', seeking); video.addEventListener('seeked', seeked);
+    function stop() { if (stopped) return; stopped = true; cancel(); clearTimeout(savedTimer); clearInterval(routeTimer); resizeObserver.disconnect(); document.removeEventListener('visibilitychange', visibility); video.removeEventListener('seeking', seeking); video.removeEventListener('seeked', seeked); video.style.opacity = previousOpacity; parent.style.position = previousPosition; host.remove(); }
     current = { stop, report: () => ({ ok: true, active, frames: frameCount, failed, message: notice.textContent, placement: { ...p }, quality:core.quality(video.videoWidth,video.videoHeight),displayWidth:Math.round(cameraRect?.width||0) }) };
     size(); original('Ожидание кадра с маркером Freecam…'); schedule();
     return current.report();

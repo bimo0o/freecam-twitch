@@ -1,10 +1,10 @@
 import { mkdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-await mkdir('.tools/presentation-media',{recursive:true});await mkdir('docs/assets/licenses',{recursive:true});
+await mkdir('.tools/presentation-media',{recursive:true});
 const args=process.argv.slice(2),get=(name,fallback)=>{const i=args.indexOf(name);return i<0?fallback:args[i+1];};
 const game=get('--game','.tools/presentation-media/gameplay.ogv'),camera=get('--camera','.tools/presentation-media/webcam.mp4');
-const offset=get('--game-offset','32');
+const offset=get('--game-offset','0');
 if(!game||!camera||!Number.isFinite(Number(offset)))throw Error('Use --game FILE --camera FILE --game-offset SECONDS');
 const filter='[0:v]fps=30,scale=1600:900:force_original_aspect_ratio=increase,crop=1600:900,setsar=1,pad=1920:1080:0:0:color=0x111018[game];[1:v]fps=30,scale=320:180,setsar=1[cam];[game][cam]overlay=1600:900:shortest=1,drawbox=x=1504:y=1016:w=24:h=24:color=0x00ff00:t=fill,drawbox=x=1528:y=1016:w=24:h=24:color=0xff00ff:t=fill,drawbox=x=1504:y=1040:w=24:h=24:color=0x00ffff:t=fill,drawbox=x=1528:y=1040:w=24:h=24:color=white:t=fill,format=yuv420p[out]';
-await new Promise((resolve,reject)=>{const p=spawn(process.env.FFMPEG_BIN||'ffmpeg',['-hide_banner','-loglevel','error','-y','-ss',offset,'-i',game,'-i',camera,'-filter_complex',filter,'-map','[out]','-an','-t','9','-c:v','libx264','-preset','veryfast','-crf','19','-g','30','-movflags','+faststart','.tools/packed-presentation.mp4'],{stdio:'inherit'});p.on('error',reject);p.on('close',code=>code?reject(Error(`FFmpeg ${code}`)):resolve());});
+await new Promise((resolve,reject)=>{const p=spawn(process.env.FFMPEG_BIN||'ffmpeg',['-hide_banner','-loglevel','error','-y','-ss',offset,'-i',game,'-i',camera,'-filter_complex',filter,'-map','[out]','-an','-shortest','-c:v','libx264','-preset','veryfast','-crf','19','-g','30','-movflags','+faststart','.tools/packed-presentation.mp4'],{stdio:'inherit'});p.on('error',reject);p.on('close',code=>code?reject(Error(`FFmpeg ${code}`)):resolve());});
 console.log('Actual gameplay + separate webcam recording packed into one video.');

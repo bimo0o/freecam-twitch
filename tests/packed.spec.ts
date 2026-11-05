@@ -1,4 +1,29 @@
 import { test, expect } from '@playwright/test';
+test('paused seeks refresh both crops without restarting or looping the source',async({page})=>{
+  await page.goto('/packed.html?demo=1&sync=1&compose=1');
+  const host=page.locator('[data-freecam-packed]');await expect(host).toHaveAttribute('data-state','active');
+  await page.locator('video').evaluate((video:HTMLVideoElement)=>video.pause());
+  const frames:number[]=[];
+  for(const time of [.5,1.2,2.4]){
+    await page.locator('video').evaluate((video:HTMLVideoElement,time)=>{video.currentTime=time;},time);
+    await expect.poll(async()=>Number(await host.getAttribute('data-media-time'))).toBeCloseTo(time,2);
+    await expect(host).toHaveAttribute('data-state','active');
+    const sample=await page.evaluate(()=>{
+      const video=document.querySelector('video')!,root=document.querySelector('[data-freecam-packed]')!.shadowRoot!;
+      const cam=root.querySelector('.cam') as HTMLCanvasElement;
+      const source=document.createElement('canvas');source.width=320;source.height=180;
+      const context=source.getContext('2d')!;context.drawImage(video,1600,900,320,180,0,0,320,180);
+      let original=0,rendered=0;
+      for(let bit=0;bit<6;bit++){
+        if(context.getImageData(25+bit*22,163,1,1).data[0]>160)original|=1<<bit;
+        if(cam.getContext('2d')!.getImageData(25+bit*22,163,1,1).data[0]>160)rendered|=1<<bit;
+      }
+      return {original,rendered,paused:video.paused};
+    });
+    expect(sample.paused).toBe(true);expect(sample.rendered).toBe(sample.original);frames.push(sample.rendered);
+  }
+  expect(new Set(frames).size).toBeGreaterThan(1);
+});
 test('animated GIF reference and movable camera retain the same frame IDs',async({page})=>{
   await page.goto('/packed.html?demo=1&sync=1&compose=1');
   const host=page.locator('[data-freecam-packed]');await expect(host).toHaveAttribute('data-state','active');
