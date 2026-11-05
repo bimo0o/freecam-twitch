@@ -1,0 +1,4 @@
+@font-face{font-family:Manrope;src:url('./Manrope.ttf') format('truetype');font-weight:200 800;font-display:swap}
+:root{--freecam-bg:#100c17;--freecam-accent:#c79aff;--freecam-text:#f5f0ff}
+.freecam-brand{display:inline-flex;align-items:center;gap:12px;color:#f5f0ff;font:800 32px/1 Manrope,'Segoe UI',sans-serif;letter-spacing:-1px;white-space:nowrap}
+.freecam-brand img{width:51px;height:40px;object-fit:contain;flex:none}

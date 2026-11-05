@@ -28,6 +28,8 @@ npm run test:extension
 
 ## GIF в README
 
+Фирменный стиль Drag описан в [дизайн-материалах](../design/freecam-drag/README.md). После изменения `public/brand/symbol.svg` выполните `node scripts/generate-brand-assets.mjs`: он экспортирует иконки и wordmark с локальным Manrope. Статические ресурсы из `public/brand` включаются в переносимый мастер, а папка `brand` рядом с `obs-hint.html` используется в OBS после закрытия мастера. Шрифт и его OFL/FONTLOG поставляются локально, без запросов к Google Fonts во время использования.
+
 Первая GIF записана с работающего локального обработчика; вторая — анимированная схема реализации, преимуществ и ограничений. Требуются Node.js 22.12+, FFmpeg и Edge на Windows. Для другого браузера доступна переменная `BROWSER_BIN` с абсолютным путём к Chromium/Chrome.
 
 ```powershell

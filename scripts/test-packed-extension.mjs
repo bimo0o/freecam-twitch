@@ -1,8 +1,10 @@
 import {chromium} from '@playwright/test';
-import {mkdir,readFile,writeFile,copyFile} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,copyFile,cp} from 'node:fs/promises';
 import path from 'node:path';
 const fixture=path.resolve('.tools/extension-proof'),profile=path.resolve('.tools/extension-proof-profile');await mkdir(fixture,{recursive:true});
 for(const file of ['core.js','runtime.js','autostart.js','popup.html','popup.js'])await copyFile(path.join('browser-extension',file),path.join(fixture,file));
+await cp('browser-extension/brand',path.join(fixture,'brand'),{recursive:true});
+await cp('browser-extension/icons',path.join(fixture,'icons'),{recursive:true});
 const manifest=JSON.parse(await readFile('browser-extension/manifest.json','utf8'));
 // Only the test fixture receives localhost host access and a worker for automation.
 manifest.host_permissions=['http://127.0.0.1/*'];manifest.background={service_worker:'proof.js'};

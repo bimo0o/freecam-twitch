@@ -11,7 +11,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Freecam Setup")]
-[assembly: AssemblyVersion("0.2.0.0")]
+[assembly: AssemblyVersion("0.2.1.0")]
 [assembly: AssemblyCopyright("Copyright © 2026 bimo0o")]
 
 // The desktop process serves only embedded, allowlisted static files on loopback.
@@ -47,12 +47,13 @@ internal static class FreecamSetup {
             }
             Application.EnableVisualStyles();
             var form = new Form { Text = "Freecam Setup", ClientSize = new Size(550, 285),
-                BackColor = Color.FromArgb(18, 14, 26), ForeColor = Color.White,
+                BackColor = Color.FromArgb(16, 12, 23), ForeColor = Color.FromArgb(245,240,255),
                 Font = new Font("Segoe UI", 11), FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false, StartPosition = FormStartPosition.CenterScreen };
-            form.Controls.Add(new Label { Text = "◈ freecam", Font = new Font("Segoe UI", 23, FontStyle.Bold),
-                ForeColor = Color.FromArgb(198,157,248), Location = new Point(25,20), Size = new Size(490,50) });
-            form.Controls.Add(new Label { Text = "Мастер открыт в вашем браузере.\nПодключите OBS и выберите игру и камеру.\nОставьте это окно открытым до завершения настройки.",
+            using (var iconStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("FreecamIcon")) form.Icon = new Icon(iconStream);
+            using (var logoStream = Assembly.GetExecutingAssembly().GetManifestResourceStream("FreecamLogo"))
+            using (var logo = Image.FromStream(logoStream)) form.Controls.Add(new PictureBox { Image = new Bitmap(logo), SizeMode = PictureBoxSizeMode.Zoom, Location = new Point(20,12), Size = new Size(245,62) });
+            form.Controls.Add(new Label { Text = "Мастер открыт в вашем браузере.\nПодключите OBS и выберите готовую сцену и камеру.\nОставьте это окно открытым до завершения настройки.",
                 Location = new Point(28,86), Size = new Size(495,85) });
             var open = new Button { Text = "Открыть мастер ещё раз", Location = new Point(28,190), Size = new Size(270,42),
                 BackColor = Color.FromArgb(191,152,242), ForeColor = Color.FromArgb(32,21,44), FlatStyle = FlatStyle.Flat };
@@ -94,7 +95,7 @@ internal static class FreecamSetup {
                         string path = first[1].Split('?')[0]; if (path == "/") path = "/setup.html";
                         if (Assets.TryGetValue(path, out body)) {
                             code = "200 OK";
-                            type = path.EndsWith(".html") ? "text/html; charset=utf-8" : path.EndsWith(".json") ? "application/json; charset=utf-8" : path.EndsWith(".js") ? "text/javascript; charset=utf-8" : path.EndsWith(".css") ? "text/css; charset=utf-8" : "text/plain; charset=utf-8";
+                            type = path.EndsWith(".html") ? "text/html; charset=utf-8" : path.EndsWith(".json") ? "application/json; charset=utf-8" : path.EndsWith(".js") ? "text/javascript; charset=utf-8" : path.EndsWith(".css") ? "text/css; charset=utf-8" : path.EndsWith(".svg") ? "image/svg+xml" : path.EndsWith(".png") ? "image/png" : path.EndsWith(".ico") ? "image/x-icon" : path.EndsWith(".ttf") ? "font/ttf" : "text/plain; charset=utf-8";
                         } else { code = "404 Not Found"; body = new byte[0]; }
                     }
                     string headers = "HTTP/1.1 " + code + "\r\nContent-Type: " + type + "\r\nContent-Length: " + body.Length
