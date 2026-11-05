@@ -11,7 +11,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Freecam Setup")]
-[assembly: AssemblyVersion("0.1.1.0")]
+[assembly: AssemblyVersion("0.1.2.0")]
 [assembly: AssemblyCopyright("Copyright © 2026 bimo0o")]
 
 // The desktop process serves only embedded, allowlisted static files on loopback.
