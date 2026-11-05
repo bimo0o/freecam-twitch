@@ -14,7 +14,7 @@ document.getElementById('file').onchange = e => {
   objectUrl = URL.createObjectURL(file); video.src = objectUrl; video.play().catch(() => {});
 };
 const query=new URLSearchParams(location.search);
-if (query.has('demo')) { video.src = query.has('sync') ? '/.tools/packed-sync.mp4' : '/.tools/packed-demo.mp4'; video.play().catch(() => {}); }
+if (query.has('demo')) { video.src = query.has('presentation') ? '/.tools/packed-presentation.mp4' : query.has('sync') ? '/.tools/packed-sync.mp4' : '/.tools/packed-demo.mp4'; video.play().catch(() => {}); }
 if(query.has('compose'))video.addEventListener('loadeddata',()=>globalThis.FreecamPackedController.start(),{once:true});
 setInterval(() => { const report = globalThis.FreecamPackedController.report(); metrics.textContent = report.active ? `Один video-элемент · кадров: ${report.frames} · игра ${report.quality.gameWidth}×${report.quality.gameHeight} · исходник камеры ${report.quality.cameraWidth}×${report.quality.cameraHeight}${report.displayWidth>report.quality.cameraWidth?' · камера увеличена: детализация не растёт':''} · звук ${video.muted ? 'выключен' : 'включён'}` : report.message || 'Ожидание маркера'; }, 500);
 addEventListener('pagehide', () => { globalThis.FreecamPackedController.stop(); if (objectUrl) URL.revokeObjectURL(objectUrl); });

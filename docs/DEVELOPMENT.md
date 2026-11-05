@@ -18,7 +18,7 @@ node scripts/generate-packed-demo.mjs --unmarked
 npm run test:packed
 ```
 
-Тест Manifest V3 использует отдельный профиль и копию manifest с тестовым доступом только к localhost. Публичный manifest остаётся с `activeTab`:
+Тест Manifest V3 использует отдельный профиль и копию manifest с тестовым доступом только к localhost. Публичный manifest имеет доступ только к Twitch; localhost добавляется лишь в тестовую копию:
 
 ```powershell
 $env:PLAYWRIGHT_BROWSERS_PATH="$PWD/.tools/playwright-browsers"
@@ -46,3 +46,5 @@ node scripts/generate-implementation-preview.mjs
 - [Предыдущая архитектура с двумя потоками](LEGACY-TWO-STREAM.md)
 - [Исходный архитектурный разбор](ARCHITECTURE.md)
 - [Предыдущие результаты проверки](VALIDATION.md)
+
+Первая GIF теперь использует отдельные пользовательские записи: [происхождение материалов](assets/CREDITS.md). Перед её генерацией выполните `scripts/prepare-presentation.mjs` с путями к этим файлам. Для проверки интерфейса мастера OBS доступен `npm exec playwright test tests/setup.spec.ts`; OBS в этом тесте заменён протокольным сервером.

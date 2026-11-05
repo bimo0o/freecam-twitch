@@ -9,11 +9,11 @@ document.getElementById('enable').onclick = async () => {
   try {
     const selected = await target();
     await chrome.scripting.executeScript({ target: selected, files: ['core.js', 'runtime.js'] });
-    const [result] = await chrome.scripting.executeScript({ target: selected, func: () => globalThis.FreecamPackedController.start() });
+    const [result] = await chrome.scripting.executeScript({ target: selected, func: async () => { await globalThis.FreecamPackedAuto?.disable(false); return globalThis.FreecamPackedController.start(); } });
     status.textContent = result.result?.message || 'Включено. Проверяем маркер в следующих кадрах.';
   } catch (err) { status.textContent = err.message; }
 };
 document.getElementById('disable').onclick = async () => {
-  try { await chrome.scripting.executeScript({ target: await target(), func: () => globalThis.FreecamPackedController?.stop() }); status.textContent = 'Исходный плеер восстановлен.'; }
+  try { await chrome.scripting.executeScript({ target: await target(), func: async () => { if(globalThis.FreecamPackedAuto)await globalThis.FreecamPackedAuto.disable(true);else globalThis.FreecamPackedController?.stop(); } }); status.textContent = 'Freecam отключён на этом канале. Исходный плеер восстановлен.'; }
   catch (err) { status.textContent = err.message; }
 };

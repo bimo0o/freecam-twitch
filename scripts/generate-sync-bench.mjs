@@ -23,6 +23,8 @@ try {
     x.fillStyle='#777087';x.font='20px Segoe UI';x.fillText('ДИАГНОСТИЧЕСКИЙ СТЕНД • это не запись живого Twitch-эфира',96,810);
   });
   await page.locator('canvas').screenshot({path:'.tools/sync-background.png'});
+  await page.evaluate(()=>{const c=document.getElementById('c');c.width=1420;c.height=132;const x=c.getContext('2d');x.fillStyle='#171020';x.fillRect(0,0,1420,132);x.fillStyle='#d8b5ff';x.font='600 34px Segoe UI';x.fillText('Установите Freecam — перемещайте вебку',20,40);x.fillStyle='#c8bdd6';x.font='25px Segoe UI';x.fillText('github.com/bimo0o/freecam-twitch',20,80);x.fillText('Chrome / Edge → значок расширений → Freecam',20,115);});
+  await page.locator('canvas').screenshot({path:'.tools/install-hint.png'});
   for(let i=0;i<60;i++) {
     await page.evaluate(frame=>{
       const c=document.getElementById('c');c.width=320;c.height=180;const x=c.getContext('2d');

@@ -5,7 +5,7 @@ await mkdir('.tools/hero-frames',{recursive:true});await mkdir('docs/assets',{re
 const browser=await chromium.launch({executablePath:process.env.BROWSER_BIN||'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',headless:true});
 try{
  const page=await browser.newPage({viewport:{width:1000,height:800},deviceScaleFactor:1});
- await page.goto('http://127.0.0.1:5173/packed.html?demo=1&sync=1&compose=1');
+ await page.goto('http://127.0.0.1:5173/packed.html?demo=1&presentation=1&compose=1');
  await page.waitForFunction(()=>document.querySelector('[data-freecam-packed]')?.dataset.state==='active');
  await page.evaluate(()=>{
   const stage=document.getElementById('stage');document.body.replaceChildren();
@@ -13,7 +13,7 @@ try{
   document.head.append(style);const header=document.createElement('header');header.innerHTML='<div class="brand"><i>◈</i> freecam</div><div class="pill">ОДИН ПОТОК · ЛИЧНОЕ УПРАВЛЕНИЕ</div>';
   const title=document.createElement('h1');title.innerHTML='Твоя камера. <span>Твоё место.</span>';
   const subtitle=document.createElement('p');subtitle.className='subtitle';subtitle.textContent='Перемещай вебку, а не весь эфир.';
-  const footer=document.createElement('div');footer.className='footer';footer.innerHTML='<span id="caption">Перетащи камеру туда, где она не мешает.</span><span class="note">ЭКСПЕРИМЕНТ · ТЕСТОВОЕ ВИДЕО</span>';
+  const footer=document.createElement('div');footer.className='footer';footer.innerHTML='<span id="caption">Перетащи камеру туда, где она не мешает.</span>';
   document.body.append(header,title,subtitle,stage,footer);const cursor=document.createElement('div');cursor.className='cursor';document.body.append(cursor);
   document.addEventListener('mousemove',e=>{cursor.style.left=e.clientX+'px';cursor.style.top=e.clientY+'px';});document.addEventListener('mousedown',()=>cursor.classList.add('down'));document.addEventListener('mouseup',()=>cursor.classList.remove('down'));
  });
@@ -31,5 +31,5 @@ try{
   await page.screenshot({path:`.tools/hero-frames/${String(frame).padStart(3,'0')}.png`});
  }
 }finally{await browser.close();}
-await new Promise((resolve,reject)=>{const p=spawn(process.env.FFMPEG_BIN||'ffmpeg',['-hide_banner','-loglevel','error','-y','-framerate','14','-i','.tools/hero-frames/%03d.png','-filter_complex','[0:v]split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle','-loop','0','docs/assets/freecam-preview.gif'],{stdio:'inherit'});p.on('error',reject);p.on('close',c=>c?reject(Error(`FFmpeg ${c}`)):resolve());});
+await new Promise((resolve,reject)=>{const p=spawn(process.env.FFMPEG_BIN||'ffmpeg',['-hide_banner','-loglevel','error','-y','-framerate','14','-i','.tools/hero-frames/%03d.png','-filter_complex','[0:v]fps=12,scale=900:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=192:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle','-loop','0','docs/assets/freecam-preview.gif'],{stdio:'inherit'});p.on('error',reject);p.on('close',c=>c?reject(Error(`FFmpeg ${c}`)):resolve());});
 console.log('README presentation generated from the working single-stream renderer.');

@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Freecam — Single Stream Experiment",
-  "version": "0.1.0",
-  "description": "Experimental camera positioning from one specially composed video. Activate manually on your own stream.",
+  "version": "0.2.0",
+  "description": "Automatic camera positioning on specially composed Twitch streams.",
   "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://www.twitch.tv/*", "https://twitch.tv/*"],
+  "content_scripts": [{"matches":["https://www.twitch.tv/*","https://twitch.tv/*"],"js":["core.js","runtime.js","autostart.js"],"run_at":"document_idle"}],
   "action": { "default_popup": "popup.html", "default_title": "Freecam: один поток" }
 }

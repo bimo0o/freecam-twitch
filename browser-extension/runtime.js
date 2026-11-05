@@ -11,7 +11,7 @@
     .restore{position:absolute;left:12px;top:12px;pointer-events:auto}.notice{position:absolute;left:12px;top:12px;max-width:85%;padding:8px;background:#201c2fe8;border-radius:5px;font-size:12px}.notice:empty{display:none}[hidden]{display:none!important}
     @media(hover:none){.tools,.resize{opacity:1}}
   `;
-  function start() {
+  function start(options = {}) {
     current?.stop();
     const candidates = [...document.querySelectorAll('video')].filter(v => v.isConnected && v.getBoundingClientRect().width > 100 && v.getBoundingClientRect().height > 70);
     const video = candidates.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
@@ -21,7 +21,7 @@
     if (!parent) return { ok: false, message: 'Область видео не найдена.' };
     const route = location.pathname;
     const key = `freecam-packed:v1:${location.hostname}:${route}`;
-    let p = core.placement(), stopped = false, failed = false, active = false, frameId, frameKind, frameCount = 0, savedTimer, drag;
+    let p = core.placement(), stopped = false, failed = false, active = false, frameId, frameKind, frameCount = 0, savedTimer, drag, lastProbe=-Infinity;
     let bounds = { width: 1, height: 1 }, cameraRect;
     const previousPosition = parent.style.position, previousOpacity = video.style.opacity;
     if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
@@ -77,13 +77,14 @@
       handle.addEventListener('pointerdown', e => pointerDown(e, resize)); handle.addEventListener('pointermove', pointerMove);
       for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) handle.addEventListener(event, () => { drag = null; });
     }
-    function original(message = '') { active = false; picture.hidden = true; video.style.opacity = previousOpacity; notice.textContent = message; host.dataset.state = failed ? 'unsupported' : 'waiting'; }
+    function original(message = '') { active = false; picture.hidden = true; video.style.opacity = previousOpacity; notice.textContent = options.silent ? '' : message; host.dataset.state = failed ? 'unsupported' : 'waiting'; }
     function adVisible() { return [...document.querySelectorAll('[data-a-target="video-ad-label"], [data-a-target="video-ad-countdown"], [data-test-selector="ad-banner-default-text"]')].some(el => el.getClientRects().length > 0); }
     function schedule() { if (stopped || failed || document.hidden) return; if (video.requestVideoFrameCallback) { frameKind = 'video'; frameId = video.requestVideoFrameCallback(draw); } else { frameKind = 'timer'; frameId = setTimeout(draw, 33); } }
     function cancel() { if (frameKind === 'video') video.cancelVideoFrameCallback?.(frameId); else clearTimeout(frameId); }
     function draw(_now, metadata) {
       if (stopped || failed) return;
       if (!video.isConnected || location.pathname !== route) { stop(); return; }
+      if(!active&&performance.now()-lastProbe<750){schedule();return;}lastProbe=performance.now();
       try {
         if (document.hidden || video.readyState < 2 || adVisible()) original();
         else if (video.mediaKeys) { failed = true; original('Защищённое видео: оставлен оригинальный плеер.'); }
