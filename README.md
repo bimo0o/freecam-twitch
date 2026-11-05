@@ -1,4 +1,4 @@
-![Freecam — перемещай вебку туда, куда хочешь](docs/assets/freecam-preview.gif)
+![Freecam — перемещай вебку туда, куда хочешь.](docs/assets/freecam-preview.gif)
 
 # Freecam — твоя камера, твоё место
 
