@@ -1,0 +1,10 @@
+{$APP_DOMAIN} {
+  encode zstd gzip
+  @private path /internal/*
+  respond @private 404
+  reverse_proxy api:3000
+}
+{$INGEST_DOMAIN} {
+  # Signaling is HTTPS; media itself uses encrypted WebRTC over UDP.
+  reverse_proxy media:8889
+}

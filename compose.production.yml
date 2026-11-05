@@ -1,0 +1,38 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      MEDIA_INTERNAL_URL: http://media:8888
+      DATA_DIR: /app/data
+    volumes:
+      - channel-data:/app/data
+    expose: ['3000']
+  media:
+    image: bluenviron/mediamtx:1.21.3
+    restart: unless-stopped
+    environment:
+      MTX_AUTHHTTPADDRESS: http://api:3000/internal/media-auth?key=${MEDIA_AUTH_SECRET}
+      MTX_WEBRTCADDITIONALHOSTS: ${PUBLIC_IP}
+    volumes:
+      - ./infra/mediamtx.local.yml:/mediamtx.yml:ro
+    ports:
+      - '127.0.0.1:1935:1935'
+      - '8189:8189/udp'
+  edge:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      INGEST_DOMAIN: ${INGEST_DOMAIN}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [api, media]
+volumes:
+  channel-data:
+  caddy-data:
