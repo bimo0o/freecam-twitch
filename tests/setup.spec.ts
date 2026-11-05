@@ -18,7 +18,7 @@ test('streamer setup authenticates locally and prepares a verified scene without
     });
     ws.send(JSON.stringify({op:0,d:{rpcVersion:1,authentication:{salt:'test-salt',challenge:'test-challenge'}}}));
   });
-  await page.goto('/setup.html');await page.getByLabel('Пароль OBS').fill('test-only-password');await page.getByRole('button',{name:'Подключить OBS'}).click();
+  await page.goto(process.env.FREECAM_SETUP_URL||'/setup.html');await page.getByLabel('Пароль OBS').fill('test-only-password');await page.getByRole('button',{name:'Подключить OBS'}).click();
   await expect(page.getByRole('status')).toHaveText('OBS подключён. Выберите источники.');
   await expect(page.getByLabel('Пароль OBS')).toHaveValue('');
   await page.getByRole('button',{name:'Подготовить и открыть сцену'}).click();

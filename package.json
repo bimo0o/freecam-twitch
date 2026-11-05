@@ -17,7 +17,9 @@
     "demo:sync": "node scripts/generate-sync-bench.mjs && node scripts/generate-packed-demo.mjs --gif docs/assets/sync-camera.gif --reference --output .tools/packed-sync.mp4",
     "test:packed": "playwright test tests/packed.spec.ts",
     "test:extension": "node scripts/test-packed-extension.mjs",
-    "setup:ui": "node scripts/start-streamer-setup.mjs"
+    "setup:ui": "node scripts/start-streamer-setup.mjs",
+    "build:streamer": "npm run build && node scripts/build-streamer-app.mjs",
+    "test:streamer": "node scripts/test-streamer-app.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",
