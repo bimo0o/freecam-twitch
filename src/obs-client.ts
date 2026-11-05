@@ -9,7 +9,7 @@ export class ObsClient implements ObsApi {
     this.close();const socket=new WebSocket(`ws://127.0.0.1:${port}`);this.socket=socket;
     await new Promise<void>((resolve,reject)=>{
       const timer=setTimeout(()=>{socket.close();reject(Error('OBS не отвечает. Включите WebSocket Server в Tools → WebSocket Server Settings.'));},7000);
-      socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error('Не удалось подключиться к OBS на этом компьютере.'));});
+      socket.addEventListener('error',()=>{clearTimeout(timer);reject(Error(`Не удалось открыть соединение с OBS на порту ${port}.\nВ OBS: Tools / Сервис → WebSocket Server Settings / Настройки сервера WebSocket. Включите Enable WebSocket server / Включить сервер WebSocket и нажмите Apply / Применить.\nСверьте Server Port / Порт сервера с полем «Порт» выше. Если сервер включён, проверьте ограничения браузера. Это сообщение само по себе не означает неверный пароль.`));});
       socket.addEventListener('close',()=>{clearTimeout(timer);reject(Error('OBS закрыл подключение. Проверьте пароль.'));this.rejectPending();});
       socket.addEventListener('message',async event=>{
         try{const packet=JSON.parse(event.data);

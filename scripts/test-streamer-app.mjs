@@ -3,7 +3,7 @@ import {spawn} from 'node:child_process';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 const ready=path.resolve('.tools/streamer-app-ready-'+Date.now()+'.txt');
-const app=spawn(path.resolve('artifacts/Freecam-Streamer/Freecam Setup.exe'),['--headless',ready],{windowsHide:true,stdio:'ignore'});
+const app=spawn(path.resolve(process.env.FREECAM_APP_OUT||'artifacts/Freecam-Streamer','Freecam Setup.exe'),['--headless',ready],{windowsHide:true,stdio:'ignore'});
 let startError;app.on('error',e=>{startError=e;});
 try{
  let url;
