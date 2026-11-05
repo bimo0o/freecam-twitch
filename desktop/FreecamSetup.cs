@@ -11,7 +11,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Freecam Setup")]
-[assembly: AssemblyVersion("0.1.2.0")]
+[assembly: AssemblyVersion("0.2.0.0")]
 [assembly: AssemblyCopyright("Copyright © 2026 bimo0o")]
 
 // The desktop process serves only embedded, allowlisted static files on loopback.
@@ -32,6 +32,9 @@ internal static class FreecamSetup {
                     Assets.Add(name, reader.ReadBytes(reader.ReadInt32()));
                 }
             }
+            string hint = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "obs-hint.html");
+            if (!File.Exists(hint)) throw new FileNotFoundException("Extract the full Freecam ZIP before launch.");
+            Assets.Add("/runtime.json", Encoding.UTF8.GetBytes("{\"obsHintPath\":\"" + hint.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}"));
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             authority = "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -91,7 +94,7 @@ internal static class FreecamSetup {
                         string path = first[1].Split('?')[0]; if (path == "/") path = "/setup.html";
                         if (Assets.TryGetValue(path, out body)) {
                             code = "200 OK";
-                            type = path.EndsWith(".html") ? "text/html; charset=utf-8" : path.EndsWith(".js") ? "text/javascript; charset=utf-8" : path.EndsWith(".css") ? "text/css; charset=utf-8" : "text/plain; charset=utf-8";
+                            type = path.EndsWith(".html") ? "text/html; charset=utf-8" : path.EndsWith(".json") ? "application/json; charset=utf-8" : path.EndsWith(".js") ? "text/javascript; charset=utf-8" : path.EndsWith(".css") ? "text/css; charset=utf-8" : "text/plain; charset=utf-8";
                         } else { code = "404 Not Found"; body = new byte[0]; }
                     }
                     string headers = "HTTP/1.1 " + code + "\r\nContent-Type: " + type + "\r\nContent-Length: " + body.Length
