@@ -12,7 +12,10 @@
     "build": "tsc --noEmit && vite build",
     "test": "tsx --test tests/*.test.ts",
     "setup": "node scripts/setup.mjs",
-    "start": "tsx server/index.ts"
+    "start": "tsx server/index.ts",
+    "demo:sync": "node scripts/generate-sync-bench.mjs && node scripts/generate-packed-demo.mjs --gif docs/assets/sync-camera.gif --reference --output .tools/packed-sync.mp4",
+    "test:packed": "playwright test tests/packed.spec.ts",
+    "test:extension": "node scripts/test-packed-extension.mjs"
   },
   "dependencies": {
     "dotenv": "^18.0.9",

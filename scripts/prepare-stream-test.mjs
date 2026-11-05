@@ -1,0 +1,8 @@
+import {mkdir,copyFile,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+const out='artifacts/stream-test';await mkdir(out,{recursive:true});
+await copyFile('.tools/packed-sync.mp4',`${out}/freecam-sync-test.mp4`);
+await copyFile('docs/assets/sync-camera.gif',`${out}/sync-camera.gif`);
+await copyFile('artifacts/obs-marker.png',`${out}/obs-marker.png`);
+await writeFile(`${out}/НАЧНИ-ЗДЕСЬ.txt`,`FREECAM — ПРОВЕРКА ОДНОГО TWITCH-ПОТОКА\n\n1. Создайте отдельную сцену OBS Freecam Test.\n2. Установите холст и выход 1920x1080; FPS 30.\n3. Добавьте Media Source: ${path.resolve(out,'freecam-sync-test.mp4')}\n4. Включите Loop, растяните источник на весь холст.\n5. Выключите микрофон и звук рабочего стола. Оставьте звук Media Source: короткий импульс каждые 2 секунды.\n6. Проверьте в preview: игра, эталонная анимация, камера в нижней правой области, маленький 4-цветный маркер.\n7. Загрузите распакованное расширение из папки browser-extension через страницу расширений браузера.\n8. Запустите обычный тестовый эфир на своём Twitch-канале.\n9. Откройте сам канал на twitch.tv, нажмите значок Freecam и включите обработку.\n10. Номера FRAME в эталоне и подвижной камере должны совпадать. Проверьте drag/resize, паузу, рекламу и смену качества.\n\nЕсли маркер не найден или браузер запрещает чтение кадров, должен остаться оригинальный плеер. Не обходите защиту.\n\nЭто синтетический стенд, не обещание совместимости с Twitch. Приложение не запускает публичный эфир автоматически.\nПолная инструкция: docs/STREAM-TEST.md\n`,'utf8');
+console.log(`Stream test ready: ${path.resolve(out)}`);
