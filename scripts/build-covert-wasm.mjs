@@ -1,0 +1,3 @@
+import {spawn} from 'node:child_process';import {mkdir} from 'node:fs/promises';
+await mkdir('public/experimental',{recursive:true});
+await new Promise((ok,bad)=>{const p=spawn('clang++',['--target=wasm32','-O3','-msimd128','-ffast-math','-nostdlib','-fno-exceptions','-fno-rtti','native/covert-channel.cpp','-Wl,--no-entry','-Wl,--export-memory','-Wl,--initial-memory=16777216','-Wl,--max-memory=16777216',...['frame_ptr','bits_ptr','header_ptr','basis_ptr','soft_ptr','embed','extract','embed_pair','extract_pair','decode_fec3','decoded_ptr'].map(n=>'-Wl,--export='+n),'-o','public/experimental/covert-channel.wasm'],{stdio:'inherit',windowsHide:true});p.on('error',bad);p.on('exit',c=>c?bad(Error('clang '+c)):ok());});

@@ -1,0 +1,5 @@
+import {fastPermutation,MESSAGE_BYTES} from '../../shared/covert-fast.mjs';
+export async function createFastModem(){const {instance}=await WebAssembly.instantiate(await(await fetch('/experimental/covert-channel.wasm')).arrayBuffer()),e=instance.exports,m=e.memory.buffer,pixels=new Uint8ClampedArray(m,e.frame_ptr(),1920*1080*4),basis=new Float32Array(m,e.basis_ptr(),128),bits=new Uint8Array(m,e.bits_ptr(),32400),soft=new Float32Array(m,e.soft_ptr(),64800),decoded=new Uint8Array(m,e.decoded_ptr(),MESSAGE_BYTES);
+ for(let k=0;k<2;k++){const [u,v]=[[1,2],[2,1]][k];for(let j=0;j<64;j++)basis[k*64+j]=.25*Math.cos((2*(j%8)+1)*u*Math.PI/16)*Math.cos((2*Math.floor(j/8)+1)*v*Math.PI/16);}
+ return {embed(image,tx,step){pixels.set(image.data);bits.set(tx);const t=performance.now();e.embed_pair(step);return {image:new ImageData(new Uint8ClampedArray(pixels),1920,1080),ms:performance.now()-t};},extract(image,step){pixels.set(image.data);const t=performance.now();e.extract_pair(step);const input=new Float32Array(32400);for(let j=0;j<32400;j++)input[fastPermutation[j]]=soft[j];soft.set(input);e.decode_fec3();return {bytes:new Uint8Array(decoded),ms:performance.now()-t};}};
+}

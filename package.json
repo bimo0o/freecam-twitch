@@ -11,7 +11,7 @@
     "dev": "vite --host 127.0.0.1",
     "server": "tsx server/index.ts",
     "build": "tsc --noEmit && vite build",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test tests/*.test.ts tests/*.test.mjs",
     "setup": "node scripts/setup.mjs",
     "start": "tsx server/index.ts",
     "demo:sync": "node scripts/generate-sync-bench.mjs && node scripts/generate-packed-demo.mjs --gif docs/assets/sync-camera.gif --reference --output .tools/packed-sync.mp4",
