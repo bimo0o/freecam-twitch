@@ -4,6 +4,6 @@ export default defineConfig({
   server: { proxy: { '/api': 'http://127.0.0.1:3000', '/media': 'http://127.0.0.1:3000' } },
   build: {
     minify: false,
-    rolldownOptions: { input: ['index.html', 'overlay.html', 'config.html', 'packed.html', 'setup.html'], output: { manualChunks: (id: string) => id.includes('hls.js') ? 'hls' : undefined } }
+    rolldownOptions: { input: ['index.html', 'overlay.html', 'config.html', 'packed.html', 'setup.html', 'edge-lab.html', 'covert-lab.html'], output: { manualChunks: (id: string) => id.includes('hls.js') ? 'hls' : undefined } }
   }
 });

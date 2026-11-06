@@ -28,6 +28,7 @@
       ],
       "js": [
         "core.js",
+        "edge-core.js",
         "runtime.js",
         "autostart.js"
       ],
