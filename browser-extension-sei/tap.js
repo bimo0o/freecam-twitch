@@ -1,11 +1,13 @@
 (function() {
 	// shared/covert-primitives.mjs
+	var crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
+		let c = value;
+		for (let bit = 0; bit < 8; bit++) c = c >>> 1 ^ (c & 1 ? 3988292384 : 0);
+		return c >>> 0;
+	});
 	function crc32(bytes) {
 		let c = 4294967295;
-		for (const b of bytes) {
-			c ^= b;
-			for (let k = 0; k < 8; k++) c = c >>> 1 ^ (c & 1 ? 3988292384 : 0);
-		}
+		for (let i = 0; i < bytes.length; i++) c = c >>> 8 ^ crcTable[(c ^ bytes[i]) & 255];
 		return (c ^ 4294967295) >>> 0;
 	}
 	// shared/covert-sei.mjs
@@ -28,12 +30,13 @@
 		49
 	]);
 	var unescape = (b) => {
-		const out = [];
+		const out = new Uint8Array(b.length);
+		let length = 0;
 		for (let i = 0; i < b.length; i++) {
 			if (i >= 2 && b[i] === 3 && b[i - 1] === 0 && b[i - 2] === 0) continue;
-			out.push(b[i]);
+			out[length++] = b[i];
 		}
-		return new Uint8Array(out);
+		return out.subarray(0, length);
 	};
 	function readSei(nal) {
 		if ((nal[0] & 31) !== 6) return [];
@@ -253,13 +256,14 @@
 		const readers = /* @__PURE__ */ new WeakMap(), stats = {
 			appends: 0,
 			packets: 0,
+			payloadBytes: 0,
 			errors: 0,
 			lastError: ""
 		}, post = (type, data) => window.postMessage({
 			tag: "freecam-sei-v1",
 			type,
 			...data
-		}, location.origin);
+		}, location.origin, type === "packet" ? [data.packet.bytes.buffer] : []);
 		if (!globalThis.SourceBuffer) {
 			post("status", { stats: {
 				...stats,
@@ -276,15 +280,18 @@
 		MediaSource.prototype.addSourceBuffer = function(type) {
 			const buffer = Reflect.apply(add, this, [type]);
 			owners.set(buffer, this);
+			if (!/^video\//i.test(type)) readers.set(buffer, null);
 			return buffer;
 		};
 		SourceBuffer.prototype.appendBuffer = function(input) {
+			if (readers.has(this) && readers.get(this) === null) return Reflect.apply(original, this, [input]);
 			try {
 				let reader = readers.get(this);
 				if (!reader) {
 					const buffer = this;
 					reader = new FragmentReader((p) => {
 						stats.packets++;
+						stats.payloadBytes += p.bytes.byteLength;
 						post("packet", { packet: {
 							...p,
 							mediaUrl: sources.get(owners.get(buffer)) || ""

@@ -8,7 +8,7 @@
 			x: .04,
 			y: .07,
 			w: .28
-		}, surface, sc;
+		}, surface, sc, epoch = 0, pumpTimer, disposed = false;
 		const key = (b) => {
 			for (let i = 0; i < b.length - 4; i++) if (b[i] === 0 && b[i + 1] === 0 && (b[i + 2] === 1 && (b[i + 3] & 31) === 5 || b[i + 2] === 0 && b[i + 3] === 1 && (b[i + 4] & 31) === 5)) return true;
 			return false;
@@ -21,6 +21,10 @@
 				hits,
 				misses,
 				cache: patches.size,
+				queue: jobs.length,
+				queueBytes: jobBytes,
+				renderPixels: canvas ? canvas.width * canvas.height + cam.width * cam.height : 0,
+				paused: !!video?.paused,
 				tap,
 				error: lastError,
 				message: !enabled ? "Отключено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
@@ -29,24 +33,35 @@
 		function original() {
 			if (host) host.hidden = true;
 		}
+		function reset() {
+			epoch++;
+			clearTimeout(pumpTimer);
+			pumpTimer = null;
+			if (decoder && decoder.state !== "closed") decoder.close();
+			decoder = null;
+			needsKey = true;
+			jobs.length = 0;
+			jobBytes = 0;
+			inflight.clear();
+			for (const p of patches.values()) p.bitmap.close();
+			patches.clear();
+			lastMatch = 0;
+			lastError = "";
+		}
 		function attach() {
+			if (disposed) return;
 			if (route !== location.pathname) {
 				route = location.pathname;
 				video?.cancelVideoFrameCallback?.(frameCallback);
 				host?.remove();
 				host = null;
 				video = null;
-				if (decoder && decoder.state !== "closed") decoder.close();
-				decoder = null;
-				needsKey = true;
-				jobs.length = 0;
-				jobBytes = 0;
-				inflight.clear();
-				for (const p of patches.values()) p.bitmap.close();
-				patches.clear();
+				reset();
+				received = decoded = hits = misses = 0;
 			}
 			const v = [...document.querySelectorAll("video")].filter((v) => v.clientWidth > 200).sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
 			if (!v || v === video) return;
+			reset();
 			if (video) video.cancelVideoFrameCallback?.(frameCallback);
 			host?.remove();
 			video = v;
@@ -56,10 +71,10 @@
 			const parent = v.parentElement;
 			if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
 			shadow = host.attachShadow({ mode: "open" });
-			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;width:100%;height:100%;inset:0}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:1px solid #c79aff;box-shadow:0 4px 16px #0006}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:6px;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:#c79aff;box-shadow:0 6px 24px #0009}.camera.dragging{cursor:grabbing;outline-color:#eadbff;box-shadow:0 10px 30px #000b}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
+			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:1px solid #c79aff;box-shadow:0 4px 16px #0006}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:6px;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:#c79aff;box-shadow:0 6px 24px #0009}.camera.dragging{cursor:grabbing;outline-color:#eadbff;box-shadow:0 10px 30px #000b}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
 			canvas = shadow.querySelector(".game");
-			canvas.width = 1920;
-			canvas.height = 1080;
+			canvas.width = 640;
+			canvas.height = 360;
 			ctx = canvas.getContext("2d");
 			wrap = shadow.querySelector(".camera");
 			wrap.tabIndex = 0;
@@ -118,10 +133,6 @@
 			original();
 			frameCallback = video.requestVideoFrameCallback(draw);
 		}
-		const snapshot = document.createElement("canvas");
-		snapshot.width = 1920;
-		snapshot.height = 1080;
-		const snap = snapshot.getContext("2d");
 		function draw(_now, meta) {
 			if (!video?.isConnected) {
 				original();
@@ -140,10 +151,15 @@
 						misses++;
 						original();
 					} else {
-						snap.drawImage(video, 0, 0, 1920, 1080);
-						ctx.drawImage(snapshot, 0, 0);
-						ctx.drawImage(selected.bitmap, selected.rect.x, selected.rect.y, selected.rect.width, selected.rect.height);
-						cc.drawImage(snapshot, selected.rect.x, selected.rect.y, selected.rect.width, selected.rect.height, 0, 0, 640, 360);
+						const r = selected.rect;
+						Object.assign(canvas.style, {
+							left: r.x / 1920 * 100 + "%",
+							top: r.y / 1080 * 100 + "%",
+							width: r.width / 1920 * 100 + "%",
+							height: r.height / 1080 * 100 + "%"
+						});
+						ctx.drawImage(selected.bitmap, 0, 0, 640, 360);
+						cc.drawImage(video, r.x / 1920 * video.videoWidth, r.y / 1080 * video.videoHeight, r.width / 1920 * video.videoWidth, r.height / 1080 * video.videoHeight, 0, 0, 640, 360);
 						host.hidden = false;
 						lastMatch = performance.now();
 						hits++;
@@ -161,10 +177,15 @@
 			frameCallback = video.requestVideoFrameCallback(draw);
 		}
 		function initialize() {
+			const generation = epoch;
 			surface = new OffscreenCanvas(640, 360);
 			sc = surface.getContext("2d", { willReadFrequently: true });
 			decoder = new VideoDecoder({
 				output: (frame) => {
+					if (generation !== epoch || !enabled) {
+						frame.close();
+						return;
+					}
 					const t = frame.timestamp / 1e6, info = inflight.get(frame.timestamp);
 					inflight.delete(frame.timestamp);
 					if (!info) {
@@ -175,6 +196,10 @@
 					const image = sc.getImageData(0, 0, 640, 360);
 					frame.close();
 					createImageBitmap(image).then((bitmap) => {
+						if (generation !== epoch || !enabled || disposed) {
+							bitmap.close();
+							return;
+						}
 						const id = Math.round(t * 1e6);
 						patches.get(id)?.bitmap.close();
 						patches.set(id, {
@@ -188,11 +213,15 @@
 							patches.get(oldest).bitmap.close();
 							patches.delete(oldest);
 						}
+					}).catch((e) => {
+						if (generation === epoch) lastError = String(e);
 					});
 				},
 				error: (e) => {
-					lastError = String(e);
-					needsKey = true;
+					if (generation === epoch) {
+						lastError = String(e);
+						needsKey = true;
+					}
 				}
 			});
 			decoder.configure({
@@ -231,7 +260,10 @@
 			} finally {
 				pumping = false;
 			}
-			if (jobs.length) setTimeout(pump, 10);
+			if (jobs.length && !pumpTimer) pumpTimer = setTimeout(() => {
+				pumpTimer = null;
+				pump();
+			}, 10);
 		}
 		const inflight = /* @__PURE__ */ new Map();
 		window.addEventListener("message", (e) => {
@@ -273,17 +305,24 @@
 			if (m.type === "status") reply(status());
 			if (m.type === "enabled") {
 				enabled = !!m.value;
-				if (!enabled) original();
+				if (!enabled) {
+					original();
+					reset();
+				}
 				reply(status());
 			}
 		});
 		globalThis.FreecamSei = { status };
-		setInterval(attach, 500);
-		window.addEventListener("pagehide", () => {
-			decoder?.close();
-			for (const p of patches.values()) p.bitmap.close();
-			patches.clear();
-			host?.remove();
+		const attachmentTimer = setInterval(attach, 500);
+		window.addEventListener("pagehide", (e) => {
+			reset();
+			original();
+			if (!e.persisted) {
+				disposed = true;
+				clearInterval(attachmentTimer);
+				video?.cancelVideoFrameCallback?.(frameCallback);
+				host?.remove();
+			}
 		});
 	})();
 })();

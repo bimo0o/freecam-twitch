@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Freecam SEI · эксперимент",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Experimental frame-aligned SEI webcam restoration on prepared Twitch broadcasts.",
   "permissions": [
     "activeTab"
