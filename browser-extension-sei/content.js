@@ -4,7 +4,7 @@
 		if (globalThis.FreecamSei) return;
 		const patches = /* @__PURE__ */ new Map();
 		let route = location.pathname;
-		let decoder, video, host, shadow, canvas, ctx, cam, cc, wrap, frameCallback, enabled = true, needsKey = true, decoded = 0, received = 0, hits = 0, misses = 0, tap = {}, lastError = "", drag, placement = {
+		let decoder, video, host, shadow, canvas, ctx, cam, cc, wrap, frameCallback, enabled = true, needsKey = true, decoded = 0, received = 0, hits = 0, misses = 0, tap = {}, lastError = "", lastMatch = 0, drag, placement = {
 			x: .04,
 			y: .07,
 			w: .28
@@ -23,7 +23,7 @@
 				cache: patches.size,
 				tap,
 				error: lastError,
-				message: !enabled ? "Отключено" : hits ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
+				message: !enabled ? "Отключено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
 			};
 		}
 		function original() {
@@ -36,7 +36,7 @@
 				host?.remove();
 				host = null;
 				video = null;
-				decoder?.close();
+				if (decoder && decoder.state !== "closed") decoder.close();
 				decoder = null;
 				needsKey = true;
 				jobs.length = 0;
@@ -52,16 +52,34 @@
 			video = v;
 			host = document.createElement("div");
 			host.dataset.freecamSei = "true";
-			host.style.cssText = "position:absolute;inset:0;z-index:2;pointer-events:none";
+			host.style.cssText = "position:absolute;inset:0;z-index:0;pointer-events:none";
 			const parent = v.parentElement;
 			if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
 			shadow = host.attachShadow({ mode: "open" });
-			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;width:100%;height:100%;inset:0}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:1px solid #c79aff;box-shadow:0 4px 16px #0006}.camera canvas{display:block;width:100%;height:100%}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
+			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;width:100%;height:100%;inset:0}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:1px solid #c79aff;box-shadow:0 4px 16px #0006}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:6px;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:#c79aff;box-shadow:0 6px 24px #0009}.camera.dragging{cursor:grabbing;outline-color:#eadbff;box-shadow:0 10px 30px #000b}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
 			canvas = shadow.querySelector(".game");
 			canvas.width = 1920;
 			canvas.height = 1080;
 			ctx = canvas.getContext("2d");
 			wrap = shadow.querySelector(".camera");
+			wrap.tabIndex = 0;
+			wrap.setAttribute("role", "group");
+			wrap.setAttribute("aria-label", "Подвижная камера. Стрелки — перемещение, Shift — быстрый шаг.");
+			wrap.onkeydown = (e) => {
+				const d = {
+					ArrowLeft: [-1, 0],
+					ArrowRight: [1, 0],
+					ArrowUp: [0, -1],
+					ArrowDown: [0, 1]
+				}[e.key];
+				if (!d) return;
+				e.preventDefault();
+				const w = host.clientWidth, h = host.clientHeight, n = e.shiftKey ? 20 : 4;
+				placement.x = Math.max(0, Math.min(w - wrap.clientWidth, wrap.offsetLeft + d[0] * n)) / w;
+				placement.y = Math.max(0, Math.min(h - wrap.clientHeight, wrap.offsetTop + d[1] * n)) / h;
+				wrap.style.left = placement.x * 100 + "%";
+				wrap.style.top = placement.y * 100 + "%";
+			};
 			cam = wrap.querySelector("canvas");
 			cam.width = 640;
 			cam.height = 360;
@@ -75,6 +93,7 @@
 			wrap.onpointerdown = (e) => {
 				if (e.button !== 0) return;
 				e.preventDefault();
+				wrap.classList.add("dragging");
 				wrap.setPointerCapture(e.pointerId);
 				drag = {
 					x: e.clientX,
@@ -91,7 +110,10 @@
 				wrap.style.left = placement.x * 100 + "%";
 				wrap.style.top = placement.y * 100 + "%";
 			};
-			wrap.onpointerup = wrap.onpointercancel = () => drag = null;
+			wrap.onpointerup = wrap.onpointercancel = wrap.onlostpointercapture = () => {
+				drag = null;
+				wrap.classList.remove("dragging");
+			};
 			parent.append(host);
 			original();
 			frameCallback = video.requestVideoFrameCallback(draw);
@@ -123,6 +145,7 @@
 						ctx.drawImage(selected.bitmap, selected.rect.x, selected.rect.y, selected.rect.width, selected.rect.height);
 						cc.drawImage(snapshot, selected.rect.x, selected.rect.y, selected.rect.width, selected.rect.height, 0, 0, 640, 360);
 						host.hidden = false;
+						lastMatch = performance.now();
 						hits++;
 						host.dataset.frames = String(hits);
 					}
