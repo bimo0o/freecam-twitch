@@ -1,9 +1,7 @@
 (function() {
-	// shared/sei-restoration-policy.mjs
-	var RESTORATION_LIMITS = Object.freeze({
-		maxArea: .25,
-		resumeArea: .2,
-		maxBitsPerSecond: 12e5
+	Object.freeze({
+		maxArea: 1,
+		resumeArea: 1
 	});
 	function restorationArea(rect, frame = {
 		width: 1920,
@@ -19,6 +17,12 @@
 		].every(Number.isFinite) || frame.width <= 0 || frame.height <= 0 || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > frame.width || rect.y + rect.height > frame.height) throw Error("Invalid restoration rectangle");
 		return rect.width * rect.height / (frame.width * frame.height);
 	}
+	function restorationPercent(value) {
+		return Number.isInteger(value) && value >= 1 && value <= 100 ? value : 25;
+	}
+	function viewerAllowsRestoration(rect, percent) {
+		return restorationArea(rect) <= restorationPercent(percent) / 100;
+	}
 	// src/extension-sei/content.mjs
 	(() => {
 		if (globalThis.FreecamSei) return;
@@ -28,7 +32,7 @@
 			x: .04,
 			y: .07,
 			w: .28
-		}, surface, sc, epoch = 0, pumpTimer, disposed = false, restorationPaused = false;
+		}, surface, sc, epoch = 0, pumpTimer, disposed = false, restorationPaused = false, restorationPauseReason = "", maxRestorationPercent = 25, lastPresentedTime = null;
 		const key = (b) => {
 			for (let i = 0; i < b.length - 4; i++) if (b[i] === 0 && b[i + 1] === 0 && (b[i + 2] === 1 && (b[i + 3] & 31) === 5 || b[i + 2] === 0 && b[i + 3] === 1 && (b[i + 4] & 31) === 5)) return true;
 			return false;
@@ -37,6 +41,8 @@
 			return {
 				enabled,
 				restorationPaused,
+				restorationPauseReason,
+				maxRestorationPercent,
 				received,
 				decoded,
 				hits,
@@ -69,6 +75,8 @@
 			lastMatch = 0;
 			lastError = "";
 			restorationPaused = false;
+			restorationPauseReason = "";
+			lastPresentedTime = null;
 		}
 		function attach() {
 			if (disposed) return;
@@ -156,6 +164,7 @@
 			frameCallback = video.requestVideoFrameCallback(draw);
 		}
 		function draw(_now, meta) {
+			lastPresentedTime = meta.mediaTime;
 			if (!video?.isConnected) {
 				original();
 				return;
@@ -172,11 +181,13 @@
 					if (!selected) {
 						misses++;
 						original();
-					} else if (selected.paused) {
+					} else if (selected.paused || !viewerAllowsRestoration(selected.rect, maxRestorationPercent)) {
 						restorationPaused = true;
+						restorationPauseReason = selected.paused ? "source" : "viewer";
 						original();
 					} else {
 						restorationPaused = false;
+						restorationPauseReason = "";
 						const r = selected.rect;
 						Object.assign(canvas.style, {
 							left: r.x / 1920 * 100 + "%",
@@ -314,7 +325,7 @@
 				p.presentationTime
 			].every(Number.isFinite) || p.width < 1 || p.height < 1 || p.x < 0 || p.y < 0 || p.x + p.width > 1920 || p.y + p.height > 1080) return;
 			received++;
-			if (!p.bytes.length || restorationArea(p) > RESTORATION_LIMITS.maxArea) {
+			if (!p.bytes.length) {
 				const id = Math.round(p.presentationTime * 1e6);
 				patches.get(id)?.bitmap?.close();
 				patches.set(id, {
@@ -350,6 +361,24 @@
 			} catch (e) {
 				lastError = String(e);
 				needsKey = true;
+			}
+		});
+		function applyPreference(value) {
+			maxRestorationPercent = restorationPercent(value);
+			if (video?.paused && lastPresentedTime !== null) {
+				video.cancelVideoFrameCallback?.(frameCallback);
+				draw(performance.now(), { mediaTime: lastPresentedTime });
+			}
+		}
+		let preferenceRevision = 0;
+		const initialRevision = preferenceRevision;
+		chrome.storage.local.get("maxRestorationPercent").then((value) => {
+			if (initialRevision === preferenceRevision) applyPreference(value.maxRestorationPercent);
+		}).catch(() => {});
+		chrome.storage.onChanged.addListener((changes, area) => {
+			if (area === "local" && changes.maxRestorationPercent) {
+				preferenceRevision++;
+				applyPreference(changes.maxRestorationPercent.newValue);
 			}
 		});
 		chrome.runtime.onMessage.addListener((m, _s, reply) => {
