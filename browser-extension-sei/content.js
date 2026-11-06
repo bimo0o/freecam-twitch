@@ -224,7 +224,7 @@
 			const parent = v.parentElement;
 			if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
 			shadow = host.attachShadow({ mode: "open" });
-			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:0;box-shadow:none}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:0;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:transparent;box-shadow:none}.camera.dragging{cursor:grabbing;outline-color:transparent;box-shadow:none}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
+			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:0;box-shadow:none}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:0;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:transparent;box-shadow:none}.camera-tools{position:absolute;right:5px;top:5px;display:flex;gap:3px;padding:3px;background:#100c17d9;border-radius:7px;opacity:0;pointer-events:none;transition:opacity 120ms}.camera:hover .camera-tools,.camera:focus-within .camera-tools{opacity:1;pointer-events:auto}.camera-tools button{width:22px;height:22px;padding:0;border:0;border-radius:4px;background:#ffffff12;color:#f5edff;font:15px system-ui;cursor:pointer}.camera-tools button:hover,.camera-tools button:focus-visible{background:#c79aff;color:#170d21}.camera.dragging{cursor:grabbing;outline-color:transparent;box-shadow:none}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
 			canvas = shadow.querySelector(".game");
 			canvas.width = 1920;
 			canvas.height = 1080;
@@ -234,6 +234,7 @@
 			wrap.setAttribute("role", "group");
 			wrap.setAttribute("aria-label", "Подвижная камера. Стрелки — перемещение, Shift — быстрый шаг. Плюс и минус — размер.");
 			wrap.onkeydown = (e) => {
+				if (e.target !== wrap) return;
 				if ([
 					"+",
 					"=",
@@ -276,6 +277,7 @@
 				aspectRatio: "16/9"
 			});
 			wrap.onpointerdown = (e) => {
+				if (e.target.closest?.("button")) return;
 				if (e.button !== 0) return;
 				e.preventDefault();
 				wrap.classList.add("dragging");
@@ -318,6 +320,53 @@
 				drag = null;
 				wrap.classList.remove("dragging");
 			};
+			const tools = document.createElement("div");
+			tools.className = "camera-tools";
+			tools.setAttribute("role", "toolbar");
+			tools.setAttribute("aria-label", "Настройки камеры");
+			for (const [text, label, action] of [
+				[
+					"−",
+					"Уменьшить",
+					() => ({ width: placement.w * 100 - 5 })
+				],
+				[
+					"+",
+					"Увеличить",
+					() => ({ width: placement.w * 100 + 5 })
+				],
+				[
+					"◜",
+					"Скругление",
+					() => ({ radius: appearance.radius ? 0 : 24 })
+				],
+				[
+					"↖",
+					"Вернуть в угол",
+					() => ({
+						x: .04,
+						y: .07
+					})
+				]
+			]) {
+				const button = document.createElement("button");
+				button.textContent = text;
+				button.title = label;
+				button.setAttribute("aria-label", label);
+				button.onpointerdown = (e) => e.stopPropagation();
+				button.onclick = (e) => {
+					e.stopPropagation();
+					applyAppearance({
+						...appearance,
+						x: placement.x,
+						y: placement.y,
+						...action()
+					});
+					saveAppearance();
+				};
+				tools.append(button);
+			}
+			wrap.append(tools);
 			parent.append(host);
 			applyAppearance(appearance);
 			const guards = [wrap, canvas].map((camera) => guardPlayerControls({
