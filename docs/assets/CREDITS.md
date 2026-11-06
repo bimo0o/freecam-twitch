@@ -17,3 +17,5 @@
 node scripts/prepare-presentation.mjs --game "путь/геймплей.mp4" --camera "путь/вебка.mp4" --game-offset 0
 node scripts/generate-readme-preview.mjs
 ```
+
+Демонстрации README пересобраны с частотой 25 FPS без декоративного курсора. GIF ограничен палитрой и способом отображения браузера; рядом размещены MP4. `obs-preview.png` и MP4 — пример композиции на пользовательских записях с ресурсами experimental, не снимок живого эфира.
