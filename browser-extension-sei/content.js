@@ -1,4 +1,24 @@
 (function() {
+	// shared/sei-restoration-policy.mjs
+	var RESTORATION_LIMITS = Object.freeze({
+		maxArea: .25,
+		resumeArea: .2,
+		maxBitsPerSecond: 12e5
+	});
+	function restorationArea(rect, frame = {
+		width: 1920,
+		height: 1080
+	}) {
+		if (![
+			frame.width,
+			frame.height,
+			rect.x,
+			rect.y,
+			rect.width,
+			rect.height
+		].every(Number.isFinite) || frame.width <= 0 || frame.height <= 0 || rect.x < 0 || rect.y < 0 || rect.width <= 0 || rect.height <= 0 || rect.x + rect.width > frame.width || rect.y + rect.height > frame.height) throw Error("Invalid restoration rectangle");
+		return rect.width * rect.height / (frame.width * frame.height);
+	}
 	// src/extension-sei/content.mjs
 	(() => {
 		if (globalThis.FreecamSei) return;
@@ -8,7 +28,7 @@
 			x: .04,
 			y: .07,
 			w: .28
-		}, surface, sc, epoch = 0, pumpTimer, disposed = false;
+		}, surface, sc, epoch = 0, pumpTimer, disposed = false, restorationPaused = false;
 		const key = (b) => {
 			for (let i = 0; i < b.length - 4; i++) if (b[i] === 0 && b[i + 1] === 0 && (b[i + 2] === 1 && (b[i + 3] & 31) === 5 || b[i + 2] === 0 && b[i + 3] === 1 && (b[i + 4] & 31) === 5)) return true;
 			return false;
@@ -16,6 +36,7 @@
 		function status() {
 			return {
 				enabled,
+				restorationPaused,
 				received,
 				decoded,
 				hits,
@@ -27,7 +48,7 @@
 				paused: !!video?.paused,
 				tap,
 				error: lastError,
-				message: !enabled ? "Отключено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
+				message: !enabled ? "Отключено" : restorationPaused ? "Восстановление приостановлено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
 			};
 		}
 		function original() {
@@ -43,10 +64,11 @@
 			jobs.length = 0;
 			jobBytes = 0;
 			inflight.clear();
-			for (const p of patches.values()) p.bitmap.close();
+			for (const p of patches.values()) p.bitmap?.close();
 			patches.clear();
 			lastMatch = 0;
 			lastError = "";
+			restorationPaused = false;
 		}
 		function attach() {
 			if (disposed) return;
@@ -150,7 +172,11 @@
 					if (!selected) {
 						misses++;
 						original();
+					} else if (selected.paused) {
+						restorationPaused = true;
+						original();
 					} else {
+						restorationPaused = false;
 						const r = selected.rect;
 						Object.assign(canvas.style, {
 							left: r.x / 1920 * 100 + "%",
@@ -166,7 +192,7 @@
 						host.dataset.frames = String(hits);
 					}
 					for (const [id, p] of patches) if (p.t < meta.mediaTime - .15) {
-						p.bitmap.close();
+						p.bitmap?.close();
 						patches.delete(id);
 					}
 				}
@@ -201,7 +227,7 @@
 							return;
 						}
 						const id = Math.round(t * 1e6);
-						patches.get(id)?.bitmap.close();
+						patches.get(id)?.bitmap?.close();
 						patches.set(id, {
 							t,
 							bitmap,
@@ -210,7 +236,7 @@
 						decoded++;
 						while (patches.size > 120) {
 							const oldest = patches.keys().next().value;
-							patches.get(oldest).bitmap.close();
+							patches.get(oldest).bitmap?.close();
 							patches.delete(oldest);
 						}
 					}).catch((e) => {
@@ -238,6 +264,10 @@
 				while (jobs.length && decoder.decodeQueueSize < 8) {
 					const p = jobs.shift();
 					jobBytes -= p.bytes.length;
+					if (p.paused) {
+						needsKey = true;
+						continue;
+					}
 					const isKey = key(p.bytes);
 					if (needsKey && !isKey) continue;
 					if (isKey) needsKey = false;
@@ -284,6 +314,27 @@
 				p.presentationTime
 			].every(Number.isFinite) || p.width < 1 || p.height < 1 || p.x < 0 || p.y < 0 || p.x + p.width > 1920 || p.y + p.height > 1080) return;
 			received++;
+			if (!p.bytes.length || restorationArea(p) > RESTORATION_LIMITS.maxArea) {
+				const id = Math.round(p.presentationTime * 1e6);
+				patches.get(id)?.bitmap?.close();
+				patches.set(id, {
+					t: p.presentationTime,
+					paused: true
+				});
+				while (patches.size > 120) {
+					const oldest = patches.keys().next().value;
+					patches.get(oldest).bitmap?.close();
+					patches.delete(oldest);
+				}
+				if (decoder && jobs.length < 180) {
+					jobs.push({
+						paused: true,
+						bytes: /* @__PURE__ */ new Uint8Array()
+					});
+					pump();
+				}
+				return;
+			}
 			try {
 				if (!decoder || decoder.state === "closed") initialize();
 				if (jobs.length >= 180 || jobBytes + p.bytes.length > 8388608) {

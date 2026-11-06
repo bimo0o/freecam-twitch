@@ -1,4 +1,9 @@
 (function() {
+	Object.freeze({
+		maxArea: .25,
+		resumeArea: .2,
+		maxBitsPerSecond: 12e5
+	});
 	// shared/covert-primitives.mjs
 	var crcTable = Uint32Array.from({ length: 256 }, (_, value) => {
 		let c = value;
