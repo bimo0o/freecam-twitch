@@ -96,7 +96,50 @@
 	(() => {
 		if (globalThis.FreecamSei) return;
 		const patches = /* @__PURE__ */ new Map(), startedAt = performance.now();
-		let controlGuard;
+		let appearance = {
+			width: 28,
+			radius: 0,
+			x: .04,
+			y: .07
+		}, controlGuard;
+		const profileKey = () => "camera:" + location.pathname.split("/")[1];
+		function applyAppearance(value = {}) {
+			appearance = {
+				width: Math.max(10, Math.min(70, Number(value.width) || 28)),
+				radius: Math.max(0, Math.min(48, Number(value.radius) || 0)),
+				x: Math.max(0, Math.min(1, Number.isFinite(value.x) ? value.x : .04)),
+				y: Math.max(0, Math.min(1, Number.isFinite(value.y) ? value.y : .07))
+			};
+			placement = {
+				x: appearance.x,
+				y: appearance.y,
+				w: appearance.width / 100
+			};
+			if (wrap) {
+				wrap.style.width = appearance.width + "%";
+				wrap.style.borderRadius = appearance.radius + "px";
+				const w = host.clientWidth, h = host.clientHeight;
+				placement.x = Math.min(placement.x, Math.max(0, 1 - wrap.offsetWidth / (w || 1)));
+				placement.y = Math.min(placement.y, Math.max(0, 1 - wrap.offsetHeight / (h || 1)));
+				wrap.style.left = placement.x * 100 + "%";
+				wrap.style.top = placement.y * 100 + "%";
+				controlGuard?.schedule();
+			}
+		}
+		function loadAppearance() {
+			const key = profileKey();
+			chrome.storage.local.get(key).then((v) => {
+				if (key === profileKey()) applyAppearance(v[key]);
+			}).catch(() => {});
+		}
+		function saveAppearance() {
+			chrome.storage.local.set({ [profileKey()]: {
+				...appearance,
+				x: placement.x,
+				y: placement.y,
+				width: placement.w * 100
+			} }).catch(() => {});
+		}
 		let route = location.pathname;
 		let decoder, video, host, shadow, canvas, ctx, cam, cc, wrap, frameCallback, enabled = true, needsKey = true, decoded = 0, received = 0, hits = 0, misses = 0, tap = {}, lastError = "", lastMatch = 0, drag, placement = {
 			x: .04,
@@ -154,6 +197,7 @@
 			if (disposed) return;
 			if (route !== location.pathname) {
 				route = location.pathname;
+				loadAppearance();
 				video?.cancelVideoFrameCallback?.(frameCallback);
 				controlGuard?.close();
 				host?.remove();
@@ -175,7 +219,7 @@
 			const parent = v.parentElement;
 			if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
 			shadow = host.attachShadow({ mode: "open" });
-			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:1px solid #c79aff;box-shadow:0 4px 16px #0006}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:6px;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:#c79aff;box-shadow:0 6px 24px #0009}.camera.dragging{cursor:grabbing;outline-color:#eadbff;box-shadow:0 10px 30px #000b}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
+			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:0;box-shadow:none}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:0;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:transparent;box-shadow:none}.camera.dragging{cursor:grabbing;outline-color:transparent;box-shadow:none}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
 			canvas = shadow.querySelector(".game");
 			canvas.width = 640;
 			canvas.height = 360;
@@ -183,8 +227,24 @@
 			wrap = shadow.querySelector(".camera");
 			wrap.tabIndex = 0;
 			wrap.setAttribute("role", "group");
-			wrap.setAttribute("aria-label", "Подвижная камера. Стрелки — перемещение, Shift — быстрый шаг.");
+			wrap.setAttribute("aria-label", "Подвижная камера. Стрелки — перемещение, Shift — быстрый шаг. Плюс и минус — размер.");
 			wrap.onkeydown = (e) => {
+				if ([
+					"+",
+					"=",
+					"-",
+					"_"
+				].includes(e.key)) {
+					e.preventDefault();
+					applyAppearance({
+						...appearance,
+						x: placement.x,
+						y: placement.y,
+						width: placement.w * 100 + (["-", "_"].includes(e.key) ? -5 : 5)
+					});
+					saveAppearance();
+					return;
+				}
 				const d = {
 					ArrowLeft: [-1, 0],
 					ArrowRight: [1, 0],
@@ -198,6 +258,7 @@
 				placement.y = Math.max(0, Math.min(h - wrap.clientHeight, wrap.offsetTop + d[1] * n)) / h;
 				wrap.style.left = placement.x * 100 + "%";
 				wrap.style.top = placement.y * 100 + "%";
+				saveAppearance();
 			};
 			cam = wrap.querySelector("canvas");
 			cam.width = 640;
@@ -230,18 +291,47 @@
 				wrap.style.top = placement.y * 100 + "%";
 			};
 			wrap.onpointerup = wrap.onpointercancel = wrap.onlostpointercapture = () => {
+				if (drag) {
+					const w = host.clientWidth, h = host.clientHeight;
+					for (const [axis, size, extent] of [[
+						"x",
+						w,
+						wrap.offsetWidth
+					], [
+						"y",
+						h,
+						wrap.offsetHeight
+					]]) {
+						const end = Math.max(0, 1 - extent / (size || 1));
+						if (placement[axis] * size < 18) placement[axis] = 0;
+						else if ((end - placement[axis]) * size < 18) placement[axis] = end;
+					}
+					wrap.style.left = placement.x * 100 + "%";
+					wrap.style.top = placement.y * 100 + "%";
+					saveAppearance();
+				}
 				drag = null;
 				wrap.classList.remove("dragging");
 			};
 			parent.append(host);
+			applyAppearance(appearance);
 			const guards = [wrap, canvas].map((camera) => guardPlayerControls({
 				host,
 				camera,
 				root: video.closest("[data-a-target=video-player],.video-player") || parent
 			}));
+			const resizeObserver = new ResizeObserver(() => applyAppearance({
+				...appearance,
+				x: placement.x,
+				y: placement.y
+			}));
+			resizeObserver.observe(parent);
 			controlGuard = {
 				schedule: () => guards.forEach((g) => g.schedule()),
-				close: () => guards.forEach((g) => g.close())
+				close: () => {
+					resizeObserver.disconnect();
+					guards.forEach((g) => g.close());
+				}
 			};
 			original();
 			frameCallback = video.requestVideoFrameCallback(draw);
@@ -456,12 +546,14 @@
 				draw(performance.now(), { mediaTime: lastPresentedTime });
 			}
 		}
+		loadAppearance();
 		let preferenceRevision = 0;
 		const initialRevision = preferenceRevision;
 		chrome.storage.local.get("maxRestorationPercent").then((value) => {
 			if (initialRevision === preferenceRevision) applyPreference(value.maxRestorationPercent);
 		}).catch(() => {});
 		chrome.storage.onChanged.addListener((changes, area) => {
+			if (area === "local" && changes[profileKey()]) applyAppearance(changes[profileKey()].newValue);
 			if (area === "local" && changes.maxRestorationPercent) {
 				preferenceRevision++;
 				applyPreference(changes.maxRestorationPercent.newValue);

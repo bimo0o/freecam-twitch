@@ -23,3 +23,10 @@ slider.onchange=async()=>{const generation=++preferenceGeneration,value=Number(s
 chrome.storage.onChanged.addListener((changes,area)=>{if(area==='local'&&changes.maxRestorationPercent)showPercent(changes.maxRestorationPercent.newValue);});
 
 element('copy-status').onclick=async()=>{const report=element('status');try{if(!navigator.clipboard?.writeText)throw Error('Clipboard unavailable');await navigator.clipboard.writeText(report.value);element('copy-result').textContent='Скопировано';}catch{report.focus();report.select();element('copy-result').textContent='Отчёт выделен. Нажмите Ctrl+C.';}};
+
+let cameraKey,cameraProfile={width:28,radius:0,x:.04,y:.07};
+function displayCamera(){for(const name of ['width','radius']){element('camera-'+name).value=cameraProfile[name];element('camera-'+name+'-value').textContent=cameraProfile[name]+(name==='width'?'%':' px');}}
+async function saveCamera(reset=false){if(!cameraKey)return;try{const latest=await chrome.storage.local.get(cameraKey);cameraProfile={...cameraProfile,...latest[cameraKey],width:Number(element('camera-width').value),radius:Number(element('camera-radius').value),...(reset?{x:.04,y:.07}:{})};await chrome.storage.local.set({[cameraKey]:cameraProfile});element('appearance-status').textContent='Сохранено для этого канала';}catch{element('appearance-status').textContent='Не удалось сохранить';}}
+chrome.tabs.query({active:true,currentWindow:true}).then(async tabs=>{const tab=tabs[0];if(!tab?.url||!/^https:\/\/(www\.)?twitch\.tv\//.test(tab.url)){for(const name of ['width','radius'])element('camera-'+name).disabled=true;element('camera-reset').disabled=true;return;}cameraKey='camera:'+new URL(tab.url).pathname.split('/')[1];const value=await chrome.storage.local.get(cameraKey);cameraProfile={...cameraProfile,...value[cameraKey]};displayCamera();}).catch(()=>{});
+for(const name of ['width','radius']){element('camera-'+name).oninput=()=>{cameraProfile[name]=Number(element('camera-'+name).value);displayCamera();};element('camera-'+name).onchange=()=>saveCamera();}
+element('camera-reset').onclick=()=>{cameraProfile={...cameraProfile,x:.04,y:.07};saveCamera(true);};
