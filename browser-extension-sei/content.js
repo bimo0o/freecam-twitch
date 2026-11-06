@@ -26,7 +26,7 @@
 	// src/extension-sei/content.mjs
 	(() => {
 		if (globalThis.FreecamSei) return;
-		const patches = /* @__PURE__ */ new Map();
+		const patches = /* @__PURE__ */ new Map(), startedAt = performance.now();
 		let route = location.pathname;
 		let decoder, video, host, shadow, canvas, ctx, cam, cc, wrap, frameCallback, enabled = true, needsKey = true, decoded = 0, received = 0, hits = 0, misses = 0, tap = {}, lastError = "", lastMatch = 0, drag, placement = {
 			x: .04,
@@ -39,6 +39,8 @@
 		};
 		function status() {
 			return {
+				tapMissing: !tap.ready && performance.now() - startedAt > 5e3,
+				sourceKind: video?.srcObject ? Object.prototype.toString.call(video.srcObject) : video?.currentSrc?.startsWith("blob:") ? "blob" : "other",
 				enabled,
 				restorationPaused,
 				restorationPauseReason,

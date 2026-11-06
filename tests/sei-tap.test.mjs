@@ -17,11 +17,15 @@ function fixture(){
 test('SEI tap transfers its own payload and leaves the native video buffer intact',()=>{
   const f=fixture(),input=new Uint8Array([9,8,7]);f.media.addSourceBuffer('video/mp4').appendBuffer(input);
   assert.deepEqual(f.stats(),{feeds:1,appends:1,detached:0});
-  assert.deepEqual([...input],[9,8,7]);assert.deepEqual([...f.messages[0].packet.bytes],[1,2,3]);
-  assert.equal(f.messages[0].packet.mediaUrl,'blob:fixture');
+  assert.deepEqual([...input],[9,8,7]);assert.deepEqual([...f.messages.find(m=>m.type==='packet').packet.bytes],[1,2,3]);
+  assert.equal(f.messages.find(m=>m.type==='packet').packet.mediaUrl,'blob:fixture');
 });
 test('audio buffers bypass SEI parsing and preserve native append errors',()=>{
   const f=fixture(),audio=f.media.addSourceBuffer('audio/mp4');audio.appendBuffer(new Uint8Array([1]));
   audio.reject=true;assert.throws(()=>audio.appendBuffer(new Uint8Array([1])),/Native rejection/);
-  assert.equal(f.stats().feeds,0);assert.equal(f.stats().appends,2);assert.equal(f.messages.length,0);
+  assert.equal(f.stats().feeds,0);assert.equal(f.stats().appends,2);assert.equal(f.messages.filter(m=>m.type==='packet').length,0);
 });
+
+test('tap heartbeat confirms injection independently from player buffer activity',()=>{const f=fixture();const status=f.messages.find(m=>m.type==='status').stats;assert.equal(status.ready,true);assert.equal(status.hookIntact,true);assert.equal(status.appends,0);});
+
+test('tap parses accepted non-audio MIME types and ignores leading whitespace',()=>{for(const type of [' video/mp4; codecs="avc1.640028"','application/mp4','video/mp4']){const f=fixture();f.media.addSourceBuffer(type).appendBuffer(new Uint8Array([1]));assert.equal(f.stats().feeds,1);}});

@@ -258,7 +258,12 @@
 		if (globalThis.__freecamSeiTap) return;
 		globalThis.__freecamSeiTap = true;
 		const readers = /* @__PURE__ */ new WeakMap(), stats = {
+			ready: true,
+			sourceBufferAvailable: !!globalThis.SourceBuffer,
 			appends: 0,
+			videoAppends: 0,
+			audioAppends: 0,
+			bufferTypes: [],
 			packets: 0,
 			payloadBytes: 0,
 			errors: 0,
@@ -268,6 +273,12 @@
 			type,
 			...data
 		}, location.origin, type === "packet" ? [data.packet.bytes.buffer] : []);
+		const report = () => post("status", { stats: {
+			...stats,
+			hookIntact: !!globalThis.SourceBuffer && SourceBuffer.prototype.appendBuffer === hook
+		} });
+		let hook;
+		setInterval(report, 1500);
 		if (!globalThis.SourceBuffer) {
 			post("status", { stats: {
 				...stats,
@@ -284,11 +295,17 @@
 		MediaSource.prototype.addSourceBuffer = function(type) {
 			const buffer = Reflect.apply(add, this, [type]);
 			owners.set(buffer, this);
-			if (!/^video\//i.test(type)) readers.set(buffer, null);
+			const mime = String(type).trim();
+			if (!stats.bufferTypes.includes(mime) && stats.bufferTypes.length < 6) stats.bufferTypes.push(mime.slice(0, 160));
+			if (/^audio\//i.test(mime)) readers.set(buffer, null);
 			return buffer;
 		};
-		SourceBuffer.prototype.appendBuffer = function(input) {
-			if (readers.has(this) && readers.get(this) === null) return Reflect.apply(original, this, [input]);
+		hook = SourceBuffer.prototype.appendBuffer = function(input) {
+			stats.appends++;
+			if (readers.has(this) && readers.get(this) === null) {
+				stats.audioAppends++;
+				return Reflect.apply(original, this, [input]);
+			}
 			try {
 				let reader = readers.get(this);
 				if (!reader) {
@@ -304,7 +321,7 @@
 					readers.set(this, reader);
 				}
 				const view = input instanceof ArrayBuffer ? new Uint8Array(input) : new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
-				stats.appends++;
+				stats.videoAppends++;
 				reader.feed(view, this.timestampOffset || 0);
 			} catch (e) {
 				stats.errors++;
@@ -312,6 +329,6 @@
 			}
 			return Reflect.apply(original, this, [input]);
 		};
-		setInterval(() => post("status", { stats }), 1500);
+		report();
 	})();
 })();
