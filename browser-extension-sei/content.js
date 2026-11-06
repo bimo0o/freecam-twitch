@@ -1,47 +1,48 @@
 (function() {
 	// src/extension-sei/player-controls.mjs
 	function guardPlayerControls({ host, camera, root }) {
-		let pending = false, closed = false, last = "";
+		const saved = /* @__PURE__ */ new Map();
+		let closed = false, pending = false;
 		const selectors = "button,a[href],input,select,[role=\"button\"],[role=\"slider\"],[role=\"menu\"],[role=\"menuitem\"],[data-a-target=\"player-controls\"],.player-controls";
-		function visible(element) {
-			if (!element.getClientRects().length) return false;
-			for (let node = element; node && node !== root.parentElement; node = node.parentElement) {
-				const style = getComputedStyle(node);
-				if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+		function set(element, name, value) {
+			let record = saved.get(element);
+			if (!record) {
+				record = /* @__PURE__ */ new Map();
+				saved.set(element, record);
 			}
-			return true;
+			if (!record.has(name)) record.set(name, {
+				before: element.style.getPropertyValue(name),
+				priority: element.style.getPropertyPriority(name),
+				value
+			});
+			element.style.setProperty(name, value);
+		}
+		function restore(element, record) {
+			for (const [name, p] of record) if (element.style.getPropertyValue(name) === p.value) {
+				if (p.before) element.style.setProperty(name, p.before, p.priority);
+				else element.style.removeProperty(name);
+			}
 		}
 		function update() {
 			pending = false;
-			if (closed || host.hidden) return;
-			const box = camera.getBoundingClientRect();
-			if (!box.width || !box.height) return;
-			let path = `M0 0H${box.width}V${box.height}H0Z`;
-			const rectangles = [];
-			for (const element of root.querySelectorAll(selectors)) {
-				if (element === host || host.contains(element) || !visible(element)) continue;
-				const r = element.getBoundingClientRect(), x = Math.max(0, r.left - box.left - 2), y = Math.max(0, r.top - box.top - 2), right = Math.min(box.width, r.right - box.left + 2), bottom = Math.min(box.height, r.bottom - box.top + 2);
-				if (right > x && bottom > y) rectangles.push({
-					x,
-					y,
-					right,
-					bottom
-				});
+			if (closed) return;
+			camera.style.clipPath = "none";
+			const active = /* @__PURE__ */ new Set();
+			if (!host.hidden) for (const element of root.querySelectorAll(selectors)) {
+				if (host.contains(element) || !element.getClientRects().length) continue;
+				let layer = element;
+				while (layer.parentElement && layer.parentElement !== root && !layer.parentElement.contains(host)) layer = layer.parentElement;
+				if (layer.contains(host)) continue;
+				active.add(layer);
+				active.add(element);
+				if (getComputedStyle(layer).position === "static") set(layer, "position", "relative");
+				set(layer, "z-index", "2147483646");
+				if (layer !== element) set(layer, "pointer-events", "none");
+				set(element, "pointer-events", "auto");
 			}
-			const xs = [...new Set(rectangles.flatMap((r) => [r.x, r.right]))].sort((a, b) => a - b);
-			for (let i = 0; i < xs.length - 1; i++) {
-				const x = xs[i], right = xs[i + 1], bands = rectangles.filter((r) => r.x <= x && r.right >= right).map((r) => [r.y, r.bottom]).sort((a, b) => a[0] - b[0]), merged = [];
-				for (const band of bands) {
-					const previous = merged.at(-1);
-					if (previous && band[0] <= previous[1]) previous[1] = Math.max(previous[1], band[1]);
-					else merged.push([...band]);
-				}
-				for (const [y, bottom] of merged) path += `M${x} ${y}H${right}V${bottom}H${x}Z`;
-			}
-			const clip = rectangles.length ? `path(evenodd, "${path}")` : "none";
-			if (clip !== last) {
-				camera.style.clipPath = clip;
-				last = clip;
+			for (const [element, record] of saved) if (!active.has(element)) {
+				restore(element, record);
+				saved.delete(element);
 			}
 		}
 		function schedule() {
@@ -65,6 +66,9 @@
 				root.removeEventListener("focusin", schedule, true);
 				window.removeEventListener("resize", schedule);
 				document.removeEventListener("fullscreenchange", schedule);
+				for (const [element, record] of saved) restore(element, record);
+				saved.clear();
+				camera.style.clipPath = "none";
 			}
 		};
 	}
@@ -152,6 +156,7 @@
 		};
 		function status() {
 			return {
+				maxPairDeltaMs,
 				tapMissing: !tap.ready && performance.now() - startedAt > 5e3,
 				sourceKind: video?.srcObject ? Object.prototype.toString.call(video.srcObject) : video?.currentSrc?.startsWith("blob:") ? "blob" : "other",
 				enabled,
@@ -219,10 +224,10 @@
 			const parent = v.parentElement;
 			if (getComputedStyle(parent).position === "static") parent.style.position = "relative";
 			shadow = host.attachShadow({ mode: "open" });
-			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:0;box-shadow:none}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:0;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:transparent;box-shadow:none}.camera.dragging{cursor:grabbing;outline-color:transparent;box-shadow:none}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
+			shadow.innerHTML = "<style>:host{pointer-events:none}.game{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.camera{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;border:0;box-shadow:none}.camera canvas{display:block;width:100%;height:100%}.camera{outline:2px solid transparent;outline-offset:2px;transition:box-shadow 140ms ease,outline-color 140ms ease;border-radius:0;overflow:hidden}.camera:hover,.camera:focus-visible{outline-color:transparent;box-shadow:none}.camera.dragging{cursor:grabbing;outline-color:transparent;box-shadow:none}@media(prefers-reduced-motion:reduce){.camera{transition:none}}</style><canvas class=\"game\"></canvas><div class=\"camera\"><canvas></canvas></div>";
 			canvas = shadow.querySelector(".game");
-			canvas.width = 640;
-			canvas.height = 360;
+			canvas.width = 1920;
+			canvas.height = 1080;
 			ctx = canvas.getContext("2d");
 			wrap = shadow.querySelector(".camera");
 			wrap.tabIndex = 0;
@@ -336,6 +341,11 @@
 			original();
 			frameCallback = video.requestVideoFrameCallback(draw);
 		}
+		const snapshot = document.createElement("canvas");
+		snapshot.width = 1920;
+		snapshot.height = 1080;
+		const snapshotContext = snapshot.getContext("2d");
+		let maxPairDeltaMs = 0;
 		function draw(_now, meta) {
 			lastPresentedTime = meta.mediaTime;
 			if (!video?.isConnected) {
@@ -362,14 +372,11 @@
 						restorationPaused = false;
 						restorationPauseReason = "";
 						const r = selected.rect;
-						Object.assign(canvas.style, {
-							left: r.x / 1920 * 100 + "%",
-							top: r.y / 1080 * 100 + "%",
-							width: r.width / 1920 * 100 + "%",
-							height: r.height / 1080 * 100 + "%"
-						});
-						ctx.drawImage(selected.bitmap, 0, 0, 640, 360);
-						cc.drawImage(video, r.x / 1920 * video.videoWidth, r.y / 1080 * video.videoHeight, r.width / 1920 * video.videoWidth, r.height / 1080 * video.videoHeight, 0, 0, 640, 360);
+						maxPairDeltaMs = Math.max(maxPairDeltaMs, Math.abs(selected.t - meta.mediaTime) * 1e3);
+						snapshotContext.drawImage(video, 0, 0, 1920, 1080);
+						ctx.drawImage(snapshot, 0, 0);
+						ctx.drawImage(selected.bitmap, r.x, r.y, r.width, r.height);
+						cc.drawImage(snapshot, r.x, r.y, r.width, r.height, 0, 0, 640, 360);
 						if (host.hidden) {
 							host.hidden = false;
 							controlGuard?.schedule();
