@@ -1,6 +1,14 @@
 import type {ObsApi} from './obs-client';
 type Item={sourceName:string;sceneItemId:number;sceneItemIndex:number;sceneItemEnabled:boolean;sceneItemLocked:boolean;isGroup?:boolean;sourceType?:string;sceneItemTransform:any;child?:Plan;blend?:string};
 type Plan={name:string;group:boolean;items:Item[];filters:any[];containsCamera:boolean;cameraTransform?:any};
+// GetSceneItemTransform reports zero bounds for unbounded items. Set's schema
+// rejects those zeros even though OBS_BOUNDS_NONE does not use the dimensions.
+export function writableTransform(t:Record<string,any>){
+  const out:Record<string,any>={};
+  for(const key of ['positionX','positionY','rotation','scaleX','scaleY','alignment','boundsType','boundsAlignment','boundsWidth','boundsHeight','cropLeft','cropTop','cropRight','cropBottom'])if(t[key]!==undefined)out[key]=t[key];
+  for(const key of ['boundsWidth','boundsHeight'])if(out[key]!==undefined&&out[key]<1){if(out.boundsType==='OBS_BOUNDS_NONE'||out.boundsType===undefined)delete out[key];else out[key]=1;}
+  return out;
+}
 // Read the complete dependency tree before making changes. Only containers on a
 // camera path need independent copies; all other widget sources remain shared.
 export async function inspectScene(obs:ObsApi,name:string,camera:string,group=false,path=new Set<string>()):Promise<Plan>{
@@ -37,10 +45,10 @@ export async function copyScene(obs:ObsApi,plan:Plan,prefix:string,created:strin
         if(!Number.isFinite(w)||!Number.isFinite(h)||w>canvas.width||h>canvas.height)throw Error('Группа камеры больше холста OBS. Вынесите камеру на верхний уровень сцены и повторите.');
         t.cropRight=(t.cropRight||0)+canvas.width-w;t.cropBottom=(t.cropBottom||0)+canvas.height-h;
       }
-      await obs.request('SetSceneItemTransform',{sceneName:name,sceneItemId:id,sceneItemTransform:t});
+      await obs.request('SetSceneItemTransform',{sceneName:name,sceneItemId:id,sceneItemTransform:writableTransform(t)});
     }else{
       id=(await obs.request('CreateSceneItem',{sceneName:name,sourceName:item.sourceName,sceneItemEnabled:item.sceneItemEnabled})).sceneItemId;
-      await obs.request('SetSceneItemTransform',{sceneName:name,sceneItemId:id,sceneItemTransform:item.sceneItemTransform});
+      await obs.request('SetSceneItemTransform',{sceneName:name,sceneItemId:id,sceneItemTransform:writableTransform(item.sceneItemTransform)});
     }
     const {sceneItemBlendMode}=await obs.request('GetSceneItemBlendMode',{sceneName:plan.name,sceneItemId:item.sceneItemId});
     await obs.request('SetSceneItemBlendMode',{sceneName:name,sceneItemId:id,sceneItemBlendMode});

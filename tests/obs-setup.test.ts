@@ -17,7 +17,7 @@ function fixture(active=false,fail=false){
  case'CreateScene':scenes.set(data.sceneName,[]);return{};
  case'GetInputSettings':return{inputSettings:settings.get(data.inputName)};
  case'CreateSceneItem':case'CreateInput':{if(type==='CreateInput')settings.set(data.inputName,data.inputSettings);const list=scenes.get(data.sceneName)!;const n=++id;list.push(item(data.sourceName||data.inputName,n));return{sceneItemId:n};}
- case'SetSceneItemTransform':{if(fail)throw Error('transform failed');const found=scenes.get(data.sceneName)!.find(v=>v.sceneItemId===data.sceneItemId);found.sceneItemTransform={...found.sceneItemTransform,...data.sceneItemTransform};return{};}
+ case'SetSceneItemTransform':{for(const key of ['boundsWidth','boundsHeight'])if(data.sceneItemTransform[key]!==undefined&&data.sceneItemTransform[key]<1)throw Error('OBS bounds below 1');if(fail)throw Error('transform failed');const found=scenes.get(data.sceneName)!.find(v=>v.sceneItemId===data.sceneItemId);found.sceneItemTransform={...found.sceneItemTransform,...data.sceneItemTransform};return{};}
  case'GetSceneItemTransform':return{sceneItemTransform:scenes.get(data.sceneName)!.find(v=>v.sceneItemId===data.sceneItemId).sceneItemTransform};
  default:return{};}}};return{api,calls,scenes};
 }
@@ -27,7 +27,7 @@ test('scene copy nests the entire composition inside the game region and isolate
  const f=fixture();const original=structuredClone([...f.scenes]);await prepare(f,'Original');
  const output=f.scenes.get('Freecam')!,composite=output.find(v=>v.sourceName?.includes('Original'))!;
  const t=composite.sceneItemTransform;assert.equal(t.positionX,0);assert.equal(t.positionY,0);assert.ok(Math.abs(t.boundsWidth-1280*5/6)<.001);assert.equal(t.boundsHeight,600);
- const copy=f.scenes.get(composite.sourceName)!;assert.deepEqual(copy.map(v=>v.sourceName).slice(0,2),['Game','Chat']);assert.deepEqual(copy[1].sceneItemTransform,original[0][1][1].sceneItemTransform);
+ const copy=f.scenes.get(composite.sourceName)!;assert.deepEqual(copy.map(v=>v.sourceName).slice(0,2),['Game','Chat']);assert.equal(copy[1].sceneItemTransform.positionX,900);assert.equal(copy[1].sceneItemTransform.scaleX,1);
  const groupCopy=f.scenes.get(copy[2].sourceName)!;assert.deepEqual(groupCopy.map(v=>v.sourceName),['Frame']);assert.equal(copy[2].sceneItemTransform.cropRight,1280-320);
  assert.equal(output.find(v=>v.sourceName==='Cam').sceneItemTransform.cropLeft,12);
  assert.deepEqual(f.scenes.get('Original'),original[0][1]);assert.deepEqual(f.scenes.get('Camera group'),original[1][1]);
@@ -38,3 +38,5 @@ test('scene copy nests the entire composition inside the game region and isolate
 test('OBS setup refuses to mutate a live broadcast',async()=>{const f=fixture(true);await assert.rejects(prepare(f));assert.ok(!f.calls.some(v=>v.type==='CreateScene'||v.type==='SetVideoSettings'));});
 test('OBS setup rolls back its own scene and resolution without deleting original sources',async()=>{const f=fixture(false,true);await assert.rejects(prepare(f));assert.ok(f.calls.some(v=>v.type==='RemoveScene'));assert.ok(f.calls.filter(v=>v.type==='RemoveInput').every(v=>!['Game','Cam','Chat','Frame'].includes(v.data.inputName)));assert.equal(f.calls.filter(v=>v.type==='SetVideoSettings').at(-1)?.data.outputWidth,1280);});
 test('failed scene copy removes every temporary scene and restores the previous output',async()=>{const f=fixture();const originalRequest=f.api.request;f.api.request=async(type,data={})=>{if(type==='CreateSourceFilter')throw Error('Filter failed');return originalRequest(type,data);};await assert.rejects(prepare(f,'Original'));const made=f.calls.filter(v=>v.type==='CreateScene').map(v=>v.data.sceneName);const removed=f.calls.filter(v=>v.type==='RemoveScene').map(v=>v.data.sceneName);assert.deepEqual(new Set(removed),new Set(made));assert.ok(!removed.includes('Original'));assert.equal(f.calls.filter(v=>v.type==='SetVideoSettings').at(-1)?.data.outputWidth,1280);});
+
+test('writable transforms omit unused zero bounds and read-only fields',async()=>{const {writableTransform}=await import('../src/obs-scene-copy');assert.deepEqual(writableTransform({boundsType:'OBS_BOUNDS_NONE',boundsWidth:0,boundsHeight:0,positionX:12,sourceWidth:1920}),{boundsType:'OBS_BOUNDS_NONE',positionX:12});assert.equal(writableTransform({boundsType:'OBS_BOUNDS_SCALE_INNER',boundsWidth:0}).boundsWidth,1);});

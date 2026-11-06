@@ -1,11 +1,45 @@
 {
   "manifest_version": 3,
-  "name": "Freecam — твоя камера, твоё место",
-  "version": "0.2.1",
-  "icons": {"16":"icons/16.png","32":"icons/32.png","48":"icons/48.png","128":"icons/128.png"},
+  "name": "Freecam вЂ” С‚РІРѕСЏ РєР°РјРµСЂР°, С‚РІРѕС‘ РјРµСЃС‚Рѕ",
+  "version": "0.3.0",
+  "icons": {
+    "16": "icons/16.png",
+    "32": "icons/32.png",
+    "48": "icons/48.png",
+    "128": "icons/128.png"
+  },
   "description": "Automatic camera positioning on specially composed Twitch streams.",
-  "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["https://www.twitch.tv/*", "https://twitch.tv/*"],
-  "content_scripts": [{"matches":["https://www.twitch.tv/*","https://twitch.tv/*"],"js":["core.js","runtime.js","autostart.js"],"run_at":"document_idle"}],
-  "action": { "default_popup": "popup.html", "default_title": "Freecam: один поток", "default_icon":{"16":"icons/16.png","32":"icons/32.png"} }
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.twitch.tv/*",
+    "https://twitch.tv/*",
+    "https://m.twitch.tv/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://twitch.tv/*",
+        "https://m.twitch.tv/*"
+      ],
+      "js": [
+        "core.js",
+        "runtime.js",
+        "autostart.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Freecam: РѕРґРёРЅ РїРѕС‚РѕРє",
+    "default_icon": {
+      "16": "icons/16.png",
+      "32": "icons/32.png"
+    }
+  }
 }

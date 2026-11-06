@@ -10,8 +10,8 @@ const repair=document.getElementById('repair-hints') as HTMLButtonElement;
 async function loadHintLocation():Promise<HintLocation>{
   try{
     const response=await fetch('/runtime.json',{cache:'no-store'});
-    if(response.ok){const runtime=await response.json() as {obsHintPath?:string;hintReady?:boolean};
-      if(runtime.hintReady&&typeof runtime.obsHintPath==='string'&&runtime.obsHintPath)return {hintFile:runtime.obsHintPath};
+    if(response.ok){const runtime=await response.json() as {obsHintPath?:string;obsPanelPath?:string;hintReady?:boolean};
+      if(runtime.hintReady&&typeof runtime.obsHintPath==='string'&&runtime.obsHintPath)return {hintFile:runtime.obsHintPath,panelFile:runtime.obsPanelPath};
       throw Error('Подсказка приложения не прошла проверку. Перезапустите Freecam.');
     }
   }catch(error){if(document.documentElement.dataset.freecamDesktop)throw error;}
