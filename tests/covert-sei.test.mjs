@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {makeSei,nals,readSei,avccNals} from '../shared/covert-sei.mjs';
+test('SEI preserves binary zero/start-code sequences and long-session timestamps',()=>{const data=new Uint8Array([0,0,0,0,0,1,0,0,2,0,0,3,0,0,4,255,128]),packed=makeSei(300000,data),r=readSei(nals(packed)[0].bytes);assert.equal(r.length,1);assert.equal(r[0].id,300000);assert.equal(r[0].timestamp,10000000000);assert.deepEqual([...r[0].bytes],[...data]);});
+test('SEI ignores unrelated UUIDs and damaged payloads',()=>{const b=makeSei(0,new Uint8Array([4,5,6]));const bad=new Uint8Array(b);bad[bad.length-6]^=1;assert.equal(readSei(nals(bad)[0].bytes).length,0);assert.deepEqual(readSei(new Uint8Array([6,5,2,4,5,128])),[]);});
+test('AVC sample parser enforces lengths',()=>{assert.deepEqual([...avccNals(new Uint8Array([0,0,0,2,6,128]))[0]],[6,128]);assert.throws(()=>avccNals(new Uint8Array([0,0,1,255,6])),/length/);});

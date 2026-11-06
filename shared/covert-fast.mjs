@@ -1,0 +1,12 @@
+import {encode,permutation} from '../scripts/covert-fec.mjs';
+import {crc32} from './covert-protocol.mjs';
+export const FRAME_BITS=32400,MESSAGE_BYTES=1348,DATA_BYTES=MESSAGE_BYTES-24,FAST_FPS=30;
+export const fastPermutation=permutation(FRAME_BITS);
+export function makeFastFrame(carrierId,fragment){const b=new Uint8Array(MESSAGE_BYTES),v=new DataView(b.buffer);v.setUint32(0,0x33464346,true);v.setUint32(4,carrierId,true);v.setUint32(8,fragment?.id??0xffffffff,true);if(fragment){if(fragment.total>65535||fragment.data.length>DATA_BYTES||fragment.offset+fragment.data.length>fragment.total)throw Error('Invalid fast fragment');v.setUint16(12,fragment.offset,true);v.setUint16(14,fragment.data.length,true);v.setUint32(16,fragment.total,true);b.set(fragment.data,20);}v.setUint32(MESSAGE_BYTES-4,crc32(b.subarray(0,-4)),true);return b;}
+export function parseFastFrame(b){if(b.length!==MESSAGE_BYTES)return null;const v=new DataView(b.buffer,b.byteOffset,b.byteLength);if(v.getUint32(0,true)!==0x33464346||v.getUint32(MESSAGE_BYTES-4,true)!==crc32(b.subarray(0,-4)))return null;const f={carrierId:v.getUint32(4,true),id:v.getUint32(8,true),offset:v.getUint16(12,true),length:v.getUint16(14,true),total:v.getUint32(16,true)};if(f.id!==0xffffffff&&(f.total<1||f.total>65535||f.length<1||f.length>DATA_BYTES||f.offset+f.length>f.total))return null;return {...f,data:b.slice(20,20+f.length)};}
+export function codeFastFrame(message){const coded=encode(message,3);return Uint8Array.from(fastPermutation,i=>i<coded.length?coded[i]:0);}
+export function splitUnit(id,bytes){if(bytes.length>65535)throw Error('Access unit exceeds bounded transport');const parts=[];for(let offset=0;offset<bytes.length;offset+=DATA_BYTES)parts.push({id,offset,total:bytes.length,data:bytes.slice(offset,offset+DATA_BYTES)});return parts;}
+export class FastAssembler{
+ constructor(){this.pending=new Map();this.stats={valid:0,invalid:0,units:0,incomplete:0};}
+ push(bytes){const f=parseFastFrame(bytes);if(!f){this.stats.invalid++;return null;}this.stats.valid++;if(f.id===0xffffffff)return {header:f};let p=this.pending.get(f.id);if(f.offset===0){p={next:0,bytes:new Uint8Array(f.total)};this.pending.set(f.id,p);}if(!p||p.next!==f.offset||p.bytes.length!==f.total){this.pending.delete(f.id);this.stats.incomplete++;return {header:f};}p.bytes.set(f.data,f.offset);p.next+=f.length;for(const id of this.pending.keys())if(id<f.id-2)this.pending.delete(id);if(p.next!==f.total)return {header:f};this.pending.delete(f.id);this.stats.units++;return {header:f,unit:{id:f.id,bytes:p.bytes}};}
+}

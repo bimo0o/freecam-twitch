@@ -12,6 +12,8 @@ const fontData=(await readFile('public/brand/Manrope.ttf')).toString('base64');
 const brandCss=(await readFile('public/brand/brand.css','utf8')).replace("url('./Manrope.ttf')",`url('data:font/ttf;base64,${fontData}')`);
 const hint=(await readFile('public/obs-hint.html','utf8')).replace('<link rel="stylesheet" href="brand/brand.css">',`<style>${brandCss}</style>`).replace('src="brand/logo.png"',`src="data:image/png;base64,${(await readFile('public/brand/logo.png')).toString('base64')}"`);
 const entries=[['/setup.html',Buffer.from(html.replace('<html','<html data-freecam-desktop="true"').replace(/<p><a href="\/packed\.html[^]*?<\/a><\/p>/,'<p><a href="/LICENSE">Лицензия</a> · <a href="/notices.txt">Сторонние компоненты</a></p>'))],['/obs-hint.html',Buffer.from(hint)],['/LICENSE',await readFile('LICENSE')],['/notices.txt',notices]];
+const panel=(await readFile('public/viewer-panel.html','utf8')).replace('<link rel="stylesheet" href="brand/brand.css">',`<style>${brandCss}</style>`).replace('src="brand/logo.png"',`src="data:image/png;base64,${(await readFile('public/brand/logo.png')).toString('base64')}"`);
+entries.push(['/viewer-panel.html',Buffer.from(panel)]);
 for(const name of names)entries.push(['/'+name,await readFile('dist/'+name)]);
 for(const name of await readdir('public/brand'))if(!entries.some(([key])=>key==='/brand/'+name))entries.push(['/brand/'+name,await readFile('public/brand/'+name)]);
 const integer=n=>{const b=Buffer.alloc(4);b.writeInt32LE(n);return b;};

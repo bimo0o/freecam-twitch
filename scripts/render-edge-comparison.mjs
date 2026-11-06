@@ -1,0 +1,5 @@
+import {spawn} from 'node:child_process';
+const dir='artifacts/edge-lab';
+const title=(text)=>`pad=960:572:0:32:color=0x100c17,drawtext=fontfile=public/brand/Manrope.ttf:text='${text}':x=18:y=5:fontsize=20:fontcolor=0xc79aff`;
+const graph=`[0:v]split[g1][g2];[1:v]split[c1][c2];[g1][c1]overlay=1240:680,scale=960:540,${title('Обычный стрим')}[a];[g2]scale=1600:900,pad=1920:1080:0:0:color=0x100c17[old];[c2]scale=320:180[small];[old][small]overlay=1600:900,scale=960:540,${title('Старая версия')}[b];[2:v]scale=960:540,${title('Новая — полный фон')}[c];[3:v]scale=960:540,${title('Новая — компактный фон')}[d];[a][b][c][d]xstack=inputs=4:layout=0_0|960_0|0_572|960_572[out]`;
+await new Promise((ok,bad)=>{const p=spawn('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',dir+'/game.mp4','-i',dir+'/camera.mp4','-i',dir+'/full-1080.mp4','-i',dir+'/compact-1080.mp4','-filter_complex',graph,'-map','[out]','-an','-t','4','-r','30','-c:v','libx264','-crf','19','-pix_fmt','yuv420p','-movflags','+faststart',dir+'/comparison.mp4'],{stdio:'inherit',windowsHide:true});p.on('error',bad);p.on('exit',c=>c?bad(Error('ffmpeg '+c)):ok());});

@@ -17,19 +17,19 @@ try {
   <section class="slide" id="three"><div class="eyebrow">03 / КОМПРОМИССЫ</div><h1>Один кадр — <span>общий запас пикселей.</span></h1><p class="sub">1080p относится ко всему потоку, а не к каждой области.<br>Текущий профиль рассчитан на небольшую вебку.</p><div class="cards limits"><article class="card"><h2>ОБЛАСТЬ ИГРЫ</h2><div class="number">1600 × 900</div><p>Часть общего кадра 1920 × 1080 отведена камере.</p></article><article class="card"><h2>ОБЛАСТЬ КАМЕРЫ</h2><div class="number">320 × 180</div><p>Увеличение растягивает пиксели и не добавляет деталей.</p></article><article class="card"><h2>НА СТОРОНЕ ЗРИТЕЛЯ</h2><div class="number install">Расширение<br>браузера</div><p>Без него видна исходная компоновка OBS.</p></article></div><div class="callout">Нужна специальная сцена OBS и обработка кадров в браузере.<br>Живой Twitch, реклама и совместимость ещё требуют проверки.</div></section>
   <div class="footer"><span></span><div class="steps"><span></span><span></span><span></span></div></div><div class="progress" id="progress"></div></html>`);
   await page.evaluate(()=>document.fonts.ready);await page.locator('header img').evaluate(img=>img.decode());
-  for (let frame = 0; frame < 120; frame++) {
+  for (let frame = 0; frame < 375; frame++) {
     await page.evaluate(i => {
       const active = Math.floor(i / 40), phase = (i % 40) / 40;
       document.querySelectorAll('.slide').forEach((el, index) => { const opacity = index === active ? Math.min(1, active === 0 ? 1 : phase * 10, (1 - phase) * 10) : 0; el.style.opacity = opacity; el.style.transform = `translateY(${(1 - opacity) * 10}px)`; });
       document.querySelectorAll('.steps span').forEach((el, index) => el.classList.toggle('active', index === active));
       document.getElementById('progress').style.width = `${(i + 1) / 120 * 100}%`;
       const camera = document.getElementById('moving'); camera.style.right = `${9 + (1 - Math.cos(i / 12)) * 55}px`; camera.style.bottom = `${9 + (1 + Math.sin(i / 10)) * 21}px`;
-    }, frame);
+    }, frame * 8 / 25);
     await page.screenshot({ path: `.tools/implementation-frames/${String(frame).padStart(3, '0')}.png` });
   }
 } finally { await browser.close(); }
 await new Promise((resolve, reject) => {
-  const job = spawn(process.env.FFMPEG_BIN || 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-framerate', '8', '-i', '.tools/implementation-frames/%03d.png', '-filter_complex', '[0:v]split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle', '-loop', '0', 'docs/assets/freecam-how-it-works.gif'], { stdio: 'inherit' });
+  const job = spawn(process.env.FFMPEG_BIN || 'ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-framerate', '25', '-i', '.tools/implementation-frames/%03d.png', '-filter_complex', '[0:v]split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle', '-frames:v','375','-loop', '0', 'docs/assets/freecam-how-it-works.gif'], { stdio: 'inherit' });
   job.on('error', reject); job.on('close', code => code ? reject(new Error(`FFmpeg exit ${code}`)) : resolve());
 });
 console.log('Implementation GIF ready: docs/assets/freecam-how-it-works.gif');

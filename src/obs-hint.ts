@@ -1,5 +1,5 @@
 import type {ObsApi} from './obs-client';
-export type HintLocation={hintFile?:string;hintUrl?:string};
+export type HintLocation={hintFile?:string;hintUrl?:string;panelFile?:string};
 export function hintSettings(location:HintLocation){
   if(!location.hintFile&&!location.hintUrl)throw Error('Путь к подсказке не получен. Перезапустите приложение Freecam.');
   return {width:1420,height:132,fps_custom:true,fps:30,shutdown:false,restart_when_active:false,...(location.hintFile?{is_local_file:true,local_file:location.hintFile}:{is_local_file:false,url:location.hintUrl})};

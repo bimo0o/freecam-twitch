@@ -8,7 +8,7 @@ async function target() {
 document.getElementById('enable').onclick = async () => {
   try {
     const selected = await target();
-    await chrome.scripting.executeScript({ target: selected, files: ['core.js', 'runtime.js'] });
+    await chrome.scripting.executeScript({ target: selected, files: ['core.js', 'edge-core.js', 'runtime.js'] });
     const [result] = await chrome.scripting.executeScript({ target: selected, func: async () => { await globalThis.FreecamPackedAuto?.disable(false); return globalThis.FreecamPackedController.start(); } });
     status.textContent = result.result?.message || 'Включено. Проверяем маркер в следующих кадрах.';
   } catch (err) { status.textContent = err.message; }

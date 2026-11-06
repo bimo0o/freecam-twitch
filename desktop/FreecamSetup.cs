@@ -12,7 +12,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 [assembly: AssemblyTitle("Freecam Setup")]
-[assembly: AssemblyVersion("0.2.2.0")]
+[assembly: AssemblyVersion("0.3.0.0")]
 [assembly: AssemblyCopyright("Copyright © 2026 bimo0o")]
 
 // The desktop process serves only embedded, allowlisted static files on loopback.
@@ -24,6 +24,7 @@ internal static class FreecamSetup {
     static string url;
     static string hintPath;
     static string hintHash;
+    static string panelPath;
     static readonly object HintLock = new object();
     static string Hash(byte[] bytes) {
         using (var sha = SHA256.Create()) return BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", "").ToLowerInvariant();
@@ -32,6 +33,7 @@ internal static class FreecamSetup {
         lock (HintLock) {
             Directory.CreateDirectory(Path.GetDirectoryName(hintPath));
             if (!File.Exists(hintPath) || Hash(File.ReadAllBytes(hintPath)) != hintHash) File.WriteAllBytes(hintPath, Assets["/obs-hint.html"]);
+            if (!File.Exists(panelPath) || Hash(File.ReadAllBytes(panelPath)) != Hash(Assets["/viewer-panel.html"])) File.WriteAllBytes(panelPath, Assets["/viewer-panel.html"]);
         }
     }
 
@@ -50,8 +52,9 @@ internal static class FreecamSetup {
             string assetRoot = headless ? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(args[1])), "app-assets")
                 : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Freecam", "assets");
             hintPath = Path.Combine(assetRoot, hintHash, "obs-hint.html");
+            panelPath = Path.Combine(assetRoot, hintHash, "viewer-panel-" + Hash(Assets["/viewer-panel.html"]).Substring(0,16) + ".html");
             EnsureHint();
-            Assets.Add("/runtime.json", Encoding.UTF8.GetBytes("{\"hintReady\":true,\"hintSha256\":\"" + hintHash + "\",\"obsHintPath\":\"" + hintPath.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}"));
+            Assets.Add("/runtime.json", Encoding.UTF8.GetBytes("{\"obsPanelPath\":\"" + panelPath.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\",\"hintReady\":true,\"hintSha256\":\"" + hintHash + "\",\"obsHintPath\":\"" + hintPath.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"}"));
             listener = new TcpListener(IPAddress.Loopback, 0);
             listener.Start();
             authority = "127.0.0.1:" + ((IPEndPoint)listener.LocalEndpoint).Port;

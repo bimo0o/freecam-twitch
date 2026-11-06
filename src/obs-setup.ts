@@ -1,7 +1,7 @@
 import type {ObsApi} from './obs-client';
 import {inspectScene,copyScene} from './obs-scene-copy';
 import {hintSettings,checkHintSettings} from './obs-hint';
-export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{sceneName?:string;hintFile?:string;hintUrl?:string}={}){
+export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{sceneName?:string;hintFile?:string;hintUrl?:string;panelFile?:string}={}){
   if(!camera||(!options.sceneName&&(!game||game===camera)))throw Error('Выберите сцену или источник игры и отдельный источник камеры.');
   const stream=await obs.request('GetStreamStatus'),record=await obs.request('GetRecordStatus');
   if(stream.outputActive||record.outputActive)throw Error('Сначала остановите эфир и запись: подготовка меняет разрешение OBS.');
@@ -43,6 +43,7 @@ export async function prepareObs(obs:ObsApi,game:string,camera:string,options:{s
     const hintLocation={hintFile:options.hintFile,hintUrl:options.hintUrl||(!options.hintFile?new URL('/obs-hint.html',location.href).href:undefined)};
     const hintName=await input('Подсказка',browser,hintSettings(hintLocation),32,930,1420,132);
     await checkHintSettings(obs,hintName,hintLocation);
+    await input('Обычный просмотр',browser,{width:320,height:900,shutdown:false,...(options.panelFile?{is_local_file:true,local_file:options.panelFile}:{is_local_file:false,url:new URL('viewer-panel.html',options.hintUrl||'http://127.0.0.1:5173/obs-hint.html').href})},1600,0,320,900);
     const video=await obs.request('GetVideoSettings');if(video.baseWidth!==previousVideo.baseWidth||video.outputWidth!==1920||video.baseHeight!==previousVideo.baseHeight||video.outputHeight!==1080)throw Error('OBS не применил выход 1080p или изменил исходный холст.');
     await obs.request('SetCurrentProgramScene',{sceneName:name});
     return {sceneName:name,verified:true,previousVideo,previousScene};

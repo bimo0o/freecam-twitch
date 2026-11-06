@@ -54,7 +54,7 @@
       Object.assign(picture.style, { left: `${v.left - container.left + (v.width - width) / 2}px`, top: `${v.top - container.top + (v.height - height) / 2}px`, width: `${width}px`, height: `${height}px` });
       // Cap backing surfaces to source dimensions, avoiding a 4K canvas on a 1080p source.
       const dpr = Math.min(devicePixelRatio || 1, 2);
-      const gw = Math.max(2, Math.min(1600, Math.round(width * dpr)));
+      const gw = Math.max(2, Math.min(1920, Math.round(width * dpr)));
       if (game.width !== gw) { game.width = gw; game.height = Math.round(gw * 9 / 16); }
       cam.width = 320; cam.height = 180;
       place();
@@ -92,12 +92,20 @@
         else {
           if(snapshot.width!==video.videoWidth||snapshot.height!==video.videoHeight){snapshot.width=video.videoWidth;snapshot.height=video.videoHeight;}
           sc.drawImage(video,0,0,snapshot.width,snapshot.height);
+          const edge=globalThis.FreecamEdgeCore?.detect(snapshot);
           pc.drawImage(snapshot, ...core.crop(core.layout.marker, snapshot.width, snapshot.height), 0, 0, 8, 8);
-          if (!core.markerMatches(pc.getImageData(0, 0, 8, 8).data)) original('Нет маркера Freecam — показан исходный кадр.');
+          if (!edge && !core.markerMatches(pc.getImageData(0, 0, 8, 8).data)) original('Нет маркера Freecam — показан исходный кадр.');
           else {
             // Both surfaces are drawn synchronously from ONE video and ONE decoded frame.
-            gc.drawImage(snapshot, ...core.crop(core.layout.game, snapshot.width, snapshot.height), 0, 0, game.width, game.height);
-            if (!p.hidden) cc.drawImage(snapshot, ...core.crop(core.layout.camera, snapshot.width, snapshot.height), 0, 0, cam.width, cam.height);
+            if(edge){
+              if(cam.width!==640){cam.width=640;cam.height=360;}
+              globalThis.FreecamEdgeCore.decode(snapshot,edge,game,p.hidden?null:cam);
+              host.dataset.transport='edge-'+edge;
+            }else{
+              gc.drawImage(snapshot, ...core.crop(core.layout.game, snapshot.width, snapshot.height), 0, 0, game.width, game.height);
+              if (!p.hidden) cc.drawImage(snapshot, ...core.crop(core.layout.camera, snapshot.width, snapshot.height), 0, 0, cam.width, cam.height);
+              host.dataset.transport='packed';
+            }
             active = true; picture.hidden = false; video.style.opacity = '0'; notice.textContent = '';
             host.dataset.state = 'active'; host.dataset.frames = String(++frameCount); host.dataset.mediaTime = String(metadata?.mediaTime ?? video.currentTime);
           }

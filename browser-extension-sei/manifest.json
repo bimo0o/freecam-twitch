@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Freecam SEI · эксперимент",
+  "version": "0.4.0",
+  "description": "Experimental frame-aligned SEI webcam restoration on prepared Twitch broadcasts.",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://www.twitch.tv/*",
+    "https://twitch.tv/*"
+  ],
+  "icons": {
+    "128": "icons/128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://twitch.tv/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.twitch.tv/*",
+        "https://twitch.tv/*"
+      ],
+      "js": [
+        "tap.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/32.png"
+  }
+}

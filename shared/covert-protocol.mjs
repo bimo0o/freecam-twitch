@@ -1,0 +1,23 @@
+import {encode,decode,permutation} from '../scripts/covert-fec.mjs';
+import {crc32} from './covert-primitives.mjs';
+export {crc32,annexBUnits} from './covert-primitives.mjs';
+export const FPS=30,WINDOW=8,CARRIERS=2,HEADER_SLOTS=2048,SLOTS=64800-HEADER_SLOTS,PACKET_SLOTS=SLOTS*WINDOW;
+const perm=permutation(PACKET_SLOTS),MAGIC=0x32564346;
+function checked(bytes){if(bytes.length<8)return false;return crc32(bytes.subarray(0,-4))===new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength).getUint32(bytes.length-4,true);}
+function seal(bytes){new DataView(bytes.buffer).setUint32(bytes.length-4,crc32(bytes.subarray(0,-4)),true);return bytes;}
+export function makeHeader({frameId,packetId=0xffffffff,startFrame=0,byteLength=0,chunk=0,step=24,count=WINDOW}){const b=new Uint8Array(32),v=new DataView(b.buffer);v.setUint32(0,MAGIC,true);b[4]=2;b[5]=step;b[6]=CARRIERS;b[7]=WINDOW;v.setUint32(8,frameId,true);v.setUint32(12,packetId,true);v.setUint32(16,startFrame,true);v.setUint32(20,byteLength,true);v.setUint16(24,chunk,true);v.setUint16(26,count,true);return seal(b);}
+export function parseHeader(b){if(b.length!==32||!checked(b))return null;const v=new DataView(b.buffer,b.byteOffset,b.byteLength);if(v.getUint32(0,true)!==MAGIC||b[4]!==2||b[6]!==CARRIERS||b[7]!==WINDOW)return null;const h={step:b[5],frameId:v.getUint32(8,true),packetId:v.getUint32(12,true),startFrame:v.getUint32(16,true),byteLength:v.getUint32(20,true),chunk:v.getUint16(24,true),count:v.getUint16(26,true)};if(h.chunk>=WINDOW||h.count<1||h.count>WINDOW||h.byteLength>Math.floor(PACKET_SLOTS/3/8)-1)return null;return h;}
+export function writeFrameBits(header,packetBits){const tx=new Uint8Array(64800),coded=encode(header,3);for(let j=0;j<HEADER_SLOTS;j++)tx[j]=coded[j%coded.length];if(packetBits)tx.set(packetBits.subarray(parseHeader(header).chunk*SLOTS,(parseHeader(header).chunk+1)*SLOTS),HEADER_SLOTS);return tx;}
+export function readHeader(soft){const n=(32*8+6)*3,avg=new Float32Array(n);for(let j=0;j<HEADER_SLOTS;j++)avg[j%n]+=soft[j];return parseHeader(decode(avg,32,3,true));}
+export function packetBytes(id,start,units){let n=20;for(const u of units)n+=4+u.length;const b=new Uint8Array(n),v=new DataView(b.buffer);v.setUint32(0,0x32424346,true);v.setUint32(4,id,true);v.setUint32(8,start,true);v.setUint16(12,units.length,true);let at=16;for(const u of units){v.setUint32(at,u.length,true);at+=4;b.set(u,at);at+=u.length;}return seal(b);}
+export function parsePacket(b){if(!checked(b))return null;const v=new DataView(b.buffer,b.byteOffset,b.byteLength);if(v.getUint32(0,true)!==0x32424346)return null;const count=v.getUint16(12,true);if(count<1||count>WINDOW)return null;let at=16;const units=[];for(let i=0;i<count;i++){if(at+4>b.length-4)return null;const n=v.getUint32(at,true);at+=4;if(n===0||at+n>b.length-4)return null;units.push(b.slice(at,at+n));at+=n;}if(at!==b.length-4)return null;return {id:v.getUint32(4,true),start:v.getUint32(8,true),units};}
+export function codePacket(bytes){const coded=encode(bytes,3);if(coded.length>PACKET_SLOTS)throw Error(`Hidden channel overflow: ${bytes.length} bytes > ${Math.floor(PACKET_SLOTS/3/8)-1}`);return Uint8Array.from(perm,i=>i<coded.length?coded[i]:0);}
+export class PacketReceiver{
+ constructor(){this.pending=new Map();this.completed=new Set();this.stats={headers:0,invalidHeaders:0,packets:0,corrupt:0,duplicates:0};}
+ push(soft){const h=readHeader(soft);if(!h){this.stats.invalidHeaders++;return {header:null};}this.stats.headers++;if(h.packetId===0xffffffff)return {header:h};if(this.completed.has(h.packetId)){this.stats.duplicates++;return {header:h};}let p=this.pending.get(h.packetId);if(!p){p={header:h,soft:new Float32Array(PACKET_SLOTS),seen:new Set()};this.pending.set(h.packetId,p);}if(h.startFrame!==p.header.startFrame||h.byteLength!==p.header.byteLength){this.stats.corrupt++;return {header:h};}p.soft.set(soft.subarray(HEADER_SLOTS),h.chunk*SLOTS);p.seen.add(h.chunk);
+  // A later window makes earlier incomplete packets terminal; never mix their frames.
+  for(const [id,old]of this.pending)if(id<h.packetId-1){this.pending.delete(id);this.stats.corrupt++;}
+  if(h.chunk!==WINDOW-1)return {header:h};this.pending.delete(h.packetId);this.completed.add(h.packetId);if(this.completed.size>64)this.completed.delete(this.completed.values().next().value);
+  const rx=new Float32Array(PACKET_SLOTS);for(let j=0;j<PACKET_SLOTS;j++)rx[perm[j]]=p.soft[j];const decoded=decode(rx,h.byteLength,3,true),packet=parsePacket(decoded);if(!packet||packet.id!==h.packetId||packet.start!==h.startFrame||packet.units.length!==h.count){this.stats.corrupt++;return {header:h};}this.stats.packets++;return {header:h,packet};
+ }
+}
