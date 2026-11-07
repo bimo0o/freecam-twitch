@@ -1,5 +1,7 @@
+import {installWorkerBridge} from './worker-bridge.mjs';
 import {FragmentReader} from '../../shared/covert-fragments.mjs';
 (()=>{if(globalThis.__freecamSeiTap)return;globalThis.__freecamSeiTap=true;const readers=new WeakMap(),stats={ready:true,sourceBufferAvailable:!!globalThis.SourceBuffer,appends:0,videoAppends:0,audioAppends:0,bufferTypes:[],packets:0,payloadBytes:0,errors:0,lastError:''},post=(type,data)=>window.postMessage({tag:'freecam-sei-v1',type,...data},location.origin,type==='packet'?[data.packet.bytes.buffer]:[]);
+installWorkerBridge(typeof __FREECAM_WORKER_SOURCE__==='string'?__FREECAM_WORKER_SOURCE__:'',post,stats);
 const report=()=>post('status',{stats:{...stats,hookIntact:!!globalThis.SourceBuffer&&SourceBuffer.prototype.appendBuffer===hook}});let hook;setInterval(report,1500);
 if(!globalThis.SourceBuffer){post('status',{stats:{...stats,lastError:'MediaSource в основном окне недоступен'}});return;}const original=SourceBuffer.prototype.appendBuffer,sources=new WeakMap(),owners=new WeakMap(),create=URL.createObjectURL,add=MediaSource.prototype.addSourceBuffer;
 URL.createObjectURL=function(value){const url=Reflect.apply(create,this,[value]);if(value instanceof MediaSource)sources.set(value,url);return url;};MediaSource.prototype.addSourceBuffer=function(type){const buffer=Reflect.apply(add,this,[type]);owners.set(buffer,this);const mime=String(type).trim();if(!stats.bufferTypes.includes(mime)&&stats.bufferTypes.length<6)stats.bufferTypes.push(mime.slice(0,160));if(/^audio\//i.test(mime))readers.set(buffer,null);return buffer;};

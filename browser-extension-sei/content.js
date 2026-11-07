@@ -144,18 +144,25 @@
 				width: placement.w * 100
 			} }).catch(() => {});
 		}
+		let workerCompatibility = false;
+		const configureWorker = () => window.postMessage({
+			tag: "freecam-worker-config",
+			enabled: workerCompatibility
+		}, location.origin);
 		let route = location.pathname;
 		let decoder, video, host, shadow, canvas, ctx, cam, cc, wrap, frameCallback, enabled = true, needsKey = true, decoded = 0, received = 0, hits = 0, misses = 0, tap = {}, lastError = "", lastMatch = 0, drag, placement = {
 			x: .04,
 			y: .07,
 			w: .28
-		}, surface, sc, epoch = 0, pumpTimer, disposed = false, restorationPaused = false, restorationPauseReason = "", maxRestorationPercent = 25, lastPresentedTime = null;
+		}, surface, sc, epoch = 0, pumpTimer, disposed = false, restorationPaused = false, restorationPauseReason = "", maxRestorationPercent = 25, lastPresentedTime = null, nextAuxId = null, lastAuxTime = -Infinity;
 		const key = (b) => {
 			for (let i = 0; i < b.length - 4; i++) if (b[i] === 0 && b[i + 1] === 0 && (b[i + 2] === 1 && (b[i + 3] & 31) === 5 || b[i + 2] === 0 && b[i + 3] === 1 && (b[i + 4] & 31) === 5)) return true;
 			return false;
 		};
 		function status() {
 			return {
+				workerCompatibility,
+				workerBound: !!video?.dataset.freecamSeiMediaKey,
 				maxPairDeltaMs,
 				tapMissing: !tap.ready && performance.now() - startedAt > 5e3,
 				sourceKind: video?.srcObject ? Object.prototype.toString.call(video.srcObject) : video?.currentSrc?.startsWith("blob:") ? "blob" : "other",
@@ -174,7 +181,7 @@
 				paused: !!video?.paused,
 				tap,
 				error: lastError,
-				message: !enabled ? "Отключено" : restorationPaused ? "Восстановление приостановлено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Плееры с MSE в worker пока не поддерживаются."
+				message: !enabled ? "Отключено" : restorationPaused ? "Восстановление приостановлено" : lastMatch > 0 && performance.now() - lastMatch < 1500 ? "Восстановление работает" : received ? "Данные есть. Ожидается совпадающий кадр видео." : tap.appends ? "Буферы плеера доступны, пакетов Freecam пока нет. Выберите Source." : "Ожидаются буферы плеера. Обновите канал после установки. Для MSE в worker включите режим совместимости и обновите канал."
 			};
 		}
 		function original() {
@@ -197,6 +204,8 @@
 			restorationPaused = false;
 			restorationPauseReason = "";
 			lastPresentedTime = null;
+			nextAuxId = null;
+			lastAuxTime = -Infinity;
 		}
 		function attach() {
 			if (disposed) return;
@@ -503,17 +512,33 @@
 		function pump() {
 			if (pumping || !decoder || decoder.state !== "configured") return;
 			pumping = true;
+			jobs.sort((a, b) => a.presentationTime - b.presentationTime);
 			try {
 				while (jobs.length && decoder.decodeQueueSize < 8) {
-					const p = jobs.shift();
+					const p = jobs[0], isKey = key(p.bytes);
+					if (p.presentationTime <= lastAuxTime + 1e-6) {
+						jobs.shift();
+						jobBytes -= p.bytes.length;
+						continue;
+					}
+					if (!p.paused && !needsKey && !isKey && p.id !== nextAuxId) {
+						const recovery = jobs.findIndex((job, index) => index > 0 && !job.paused && key(job.bytes));
+						if (recovery < 0) break;
+						for (const skipped of jobs.splice(0, recovery)) jobBytes -= skipped.bytes.length;
+						needsKey = true;
+						continue;
+					}
+					jobs.shift();
 					jobBytes -= p.bytes.length;
 					if (p.paused) {
 						needsKey = true;
 						continue;
 					}
-					const isKey = key(p.bytes);
+					if (p.presentationTime <= lastAuxTime + 1e-6) continue;
 					if (needsKey && !isKey) continue;
 					if (isKey) needsKey = false;
+					nextAuxId = p.id + 1 >>> 0;
+					lastAuxTime = p.presentationTime;
 					const timestamp = Math.round(p.presentationTime * 1e6);
 					inflight.set(timestamp, {
 						x: p.x,
@@ -548,8 +573,8 @@
 			if (e.data.type !== "packet" || !enabled) return;
 			const p = e.data.packet;
 			attach();
-			if (!p.mediaUrl || !video || ![video.src, video.currentSrc].includes(p.mediaUrl)) return;
-			if (!ArrayBuffer.isView(p.bytes) || p.bytes.length > 1048576 || ![
+			if (!video || !(p.mediaUrl && [video.src, video.currentSrc].includes(p.mediaUrl) || p.mediaKey && video.dataset.freecamSeiMediaKey === p.mediaKey)) return;
+			if (!Number.isInteger(p.id) || p.id < 0 || p.id > 4294967295 || !ArrayBuffer.isView(p.bytes) || p.bytes.length > 1048576 || ![
 				p.x,
 				p.y,
 				p.width,
@@ -572,7 +597,9 @@
 				if (decoder && jobs.length < 180) {
 					jobs.push({
 						paused: true,
-						bytes: /* @__PURE__ */ new Uint8Array()
+						bytes: /* @__PURE__ */ new Uint8Array(),
+						id: p.id,
+						presentationTime: p.presentationTime
 					});
 					pump();
 				}
@@ -603,12 +630,20 @@
 			}
 		}
 		loadAppearance();
+		chrome.storage.local.get("workerCompatibility").then((value) => {
+			workerCompatibility = value.workerCompatibility === true;
+			configureWorker();
+		}).catch(() => {});
 		let preferenceRevision = 0;
 		const initialRevision = preferenceRevision;
 		chrome.storage.local.get("maxRestorationPercent").then((value) => {
 			if (initialRevision === preferenceRevision) applyPreference(value.maxRestorationPercent);
 		}).catch(() => {});
 		chrome.storage.onChanged.addListener((changes, area) => {
+			if (area === "local" && changes.workerCompatibility) {
+				workerCompatibility = changes.workerCompatibility.newValue === true;
+				configureWorker();
+			}
 			if (area === "local" && changes[profileKey()]) applyAppearance(changes[profileKey()].newValue);
 			if (area === "local" && changes.maxRestorationPercent) {
 				preferenceRevision++;

@@ -7,6 +7,9 @@ Freecam contributions, except for the limited permissions below.
 1. Scope
 This license covers original Freecam code, documentation, and design in
 this repository (the "Software"). It is not an open-source license.
+The native OBS module in native/obs-freecam/ is separately licensed under
+GPL-2.0-or-later; see native/obs-freecam/COPYING. This exception does not
+relicense the browser extension or other Freecam components.
 Third-party components and media are excluded; see section 5.
 
 2. Permitted end use

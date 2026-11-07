@@ -1,0 +1,16 @@
+import {readFile,writeFile,mkdir,readdir,copyFile} from 'node:fs/promises';
+import {spawn} from 'node:child_process';import path from 'node:path';
+const out='artifacts/Freecam-OBS-0.5.0';await mkdir(out,{recursive:true});
+const html=await readFile('dist/setup-sei.html','utf8'),names=new Set([...html.matchAll(/(?:src|href)="\.\/([^"?#]+\.(?:js|css))"/g)].map(m=>m[1]));
+for(const name of names)if(name.endsWith('.js'))for(const match of(await readFile('dist/'+name,'utf8')).matchAll(/(?:from\s*|import\s*)["']\.\/([^"']+\.js)["']/g))names.add(path.posix.join(path.posix.dirname(name),match[1]));
+const entries=[['/setup.html',Buffer.from(html)],['/obs-hint.html',Buffer.from('<!doctype html><meta charset="utf-8">')],['/viewer-panel.html',Buffer.from('<!doctype html><meta charset="utf-8">')],['/LICENSE',await readFile('LICENSE')]];
+for(const name of names)entries.push(['/'+name,await readFile('dist/'+name)]);
+for(const name of await readdir('public/brand'))if(!entries.some(([key])=>key==='/brand/'+name))entries.push(['/brand/'+name,await readFile('public/brand/'+name)]);
+const integer=value=>{const bytes=Buffer.alloc(4);bytes.writeInt32LE(value);return bytes;};const packed=[integer(entries.length)];for(const [name,data]of entries){const bytes=Buffer.from(name);packed.push(integer(bytes.length),bytes,integer(data.length),data);}await writeFile('.tools/native-assets.bin',Buffer.concat(packed));
+const source=(await readFile('desktop/FreecamSetup.cs','utf8')).replace('AssemblyVersion("0.3.0.0")','AssemblyVersion("0.5.0.0")').replace('AssemblyTitle("Freecam Setup")','AssemblyTitle("Freecam Native Setup")').replace('} catch (Exception) {','} catch (Exception error) {').replace('if (args.Length > 0 && args[0] == "--headless") Environment.Exit(1);','if (args.Length == 2 && args[0] == "--headless") { File.WriteAllText(args[1]+".error.txt", error.GetType().Name+": "+error.Message); Environment.Exit(1); }');await writeFile('.tools/FreecamNativeSetup.cs',source);
+const csc='C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe';
+const run=args=>new Promise((resolve,reject)=>{const child=spawn(csc,args,{stdio:'inherit',windowsHide:true});child.on('error',reject);child.on('exit',code=>code?reject(Error('csc '+code)):resolve());});
+const common=['/nologo','/target:winexe','/platform:anycpu','/optimize+','/codepage:65001','/reference:System.Windows.Forms.dll','/reference:System.Drawing.dll'];
+await run([...common,'/out:'+path.resolve(out,'Freecam Native Setup.exe'),'/win32icon:'+path.resolve('public/brand/freecam.ico'),'/resource:'+path.resolve('public/brand/logo.png')+',FreecamLogo','/resource:'+path.resolve('public/brand/freecam.ico')+',FreecamIcon','/resource:'+path.resolve('.tools/native-assets.bin')+',FreecamAssets',path.resolve('.tools/FreecamNativeSetup.cs')]);
+await run([...common,'/out:'+path.resolve(out,'Install Freecam OBS.exe'),'/win32icon:'+path.resolve('public/brand/freecam.ico'),'/resource:'+path.resolve(out,'freecam-obs.dll')+',FreecamNative',path.resolve('desktop/NativeObsInstaller.cs')]);
+await copyFile('native/obs-freecam/COPYING',out+'/COPYING');console.log(out);

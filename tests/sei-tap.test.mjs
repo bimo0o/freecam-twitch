@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 
-const source=(await readFile(new URL('../src/extension-sei/tap.mjs',import.meta.url),'utf8')).replace(/^import[^\n]+\n/,'');
+const source=(await readFile(new URL('../src/extension-sei/tap.mjs',import.meta.url),'utf8')).replace(/^import[^\n]+\n/gm,'');
 function fixture(){
   const messages=[];let feeds=0,appends=0,lastPayload;
   class SourceBuffer {appendBuffer(bytes){appends++;assert.ok(bytes.byteLength);if(this.reject)throw Error('Native rejection');}}
   class MediaSource {addSourceBuffer(){return new SourceBuffer();}}
   class FragmentReader {constructor(onPacket){this.onPacket=onPacket;}feed(){feeds++;lastPayload=new Uint8Array([1,2,3]);this.onPacket({bytes:lastPayload,presentationTime:0});}}
-  const context={SourceBuffer,MediaSource,FragmentReader,ArrayBuffer,Uint8Array,location:{origin:'https://www.twitch.tv'},URL:{createObjectURL:()=> 'blob:fixture'},window:{postMessage(message,_origin,transfer){messages.push(structuredClone(message,{transfer}));}},setInterval(){}};
+  const context={installWorkerBridge:()=>{},SourceBuffer,MediaSource,FragmentReader,ArrayBuffer,Uint8Array,location:{origin:'https://www.twitch.tv'},URL:{createObjectURL:()=> 'blob:fixture'},window:{postMessage(message,_origin,transfer){messages.push(structuredClone(message,{transfer}));}},setInterval(){}};
   vm.runInNewContext(source,context);
   const media=new MediaSource();context.URL.createObjectURL(media);
   return {media,messages,stats:()=>({feeds,appends,detached:lastPayload?.byteLength})};
